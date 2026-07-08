@@ -1,0 +1,10 @@
+PyQt6>=6.7.0
+PyMuPDF>=1.24.0
+pdfplumber>=0.11.0
+pandas>=2.2.0
+numpy>=2.0.0
+openpyxl>=3.1.2
+# rapidocr 1.3+ requiere Python <3.13; en Python 3.14 se instala la 1.2.x
+rapidocr-onnxruntime
+requests>=2.31.0
+pyinstaller>=6.9.0

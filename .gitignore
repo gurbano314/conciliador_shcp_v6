@@ -1,0 +1,26 @@
+# Entornos virtuales
+build_venv_qt/
+venv/
+env/
+.env
+
+# Archivos compilados de Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Directorios de compilación de PyInstaller
+build/
+dist/
+*.spec
+
+# Archivos temporales y de logs
+*.log
+.vscode/
+.idea/
+*.swp
+*.sqlite3
+
+# PDFs u otros archivos binarios pesados opcionales
+# *.pdf
+# *.xlsx
