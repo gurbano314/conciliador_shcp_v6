@@ -1,0 +1,4 @@
+{
+  "summary":  "Script that launches the PyQt6 application headlessly, populates it with realistic sample data from the EFIDEPORTE 2026 project, and captures widget screenshots using QWidget.grab() for use in the LaTeX user manual.",
+  "updatedAt":  "2026-07-06T18:34:45.142555700Z"
+}

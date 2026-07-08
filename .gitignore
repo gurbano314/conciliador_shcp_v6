@@ -24,3 +24,9 @@ dist/
 # PDFs u otros archivos binarios pesados opcionales
 # *.pdf
 # *.xlsx
+
+# LaTeX files
+*.aux
+*.log
+*.out
+*.toc
