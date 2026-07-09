@@ -1,5 +1,5 @@
 # ============================================================
-# CONCILIADOR DE COTIZACIONES  |  engine.py  v6.0
+# CONCILIADOR DE COTIZACIONES  |  engine.py  v6.1
 # Motor de extracción puro – sin dependencias de GUI.
 # Compatible con PyQt6 y cualquier otro frontend.
 # ============================================================

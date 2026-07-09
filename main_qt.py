@@ -1472,7 +1472,7 @@ class DataPanel(QWidget):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Conciliador de Cotizaciones v6.0")
+        self.setWindowTitle("Conciliador de Cotizaciones v6.1")
         self.resize(1400, 860)
         self._extract_worker: ExtractWorker | None = None
         self._pdf_combined_bytes: bytes = b""
