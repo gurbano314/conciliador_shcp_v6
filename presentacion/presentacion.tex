@@ -1,0 +1,122 @@
+\documentclass[aspectratio=169, 11pt]{beamer}
+
+% ── Configuración de idioma y fuentes ──
+\usepackage[spanish, es-noshorthands]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+
+% ── Configuración del tema Beamer ──
+\usetheme{Madrid}
+\usecolortheme{default}
+
+% ── Colores corporativos (SHCP - UPIT / VINO) ──
+\definecolor{vino}{HTML}{6E152E}
+\definecolor{vinoDark}{HTML}{4B1A28}
+\definecolor{vinoLite}{HTML}{b84a6b}
+
+% Aplicar colores al tema de la presentación
+\setbeamercolor{palette primary}{bg=vino,fg=white}
+\setbeamercolor{palette secondary}{bg=vinoDark,fg=white}
+\setbeamercolor{palette tertiary}{bg=vinoLite,fg=white}
+\setbeamercolor{structure}{fg=vino}
+\setbeamercolor{title}{bg=vino,fg=white}
+\setbeamercolor{frametitle}{bg=vino,fg=white}
+\setbeamercolor{item projected}{bg=vino,fg=white}
+
+% Eliminar iconos de navegación abajo
+\setbeamertemplate{navigation symbols}{}
+
+% ── Datos de la Portada ──
+\title[Conciliador v6.1]{Conciliador de Cotizaciones}
+\subtitle{Solución automatizada de extracción y análisis de presupuestos}
+\author[SHCP - UPIT]{SHCP - UPIT}
+\date{\today}
+
+\begin{document}
+
+% ── Diapositiva 1: Portada ──
+\begin{frame}
+    \titlepage
+\end{frame}
+
+% ── Diapositiva 2: El Problema ──
+\begin{frame}{El Problema Actual}
+    \begin{itemize}[<+->]
+        \item \textbf{Procesos Manuales Lentos:} La transcripción manual de datos económicos desde archivos PDF a hojas de Excel consume mucho tiempo.
+        \item \textbf{Riesgo de Errores:} El factor humano en el tipeo de cifras largas (presupuestos de obra, tecnología, etc.) genera discrepancias millonarias.
+        \item \textbf{Falta de Estandarización:} Cada proveedor utiliza formatos distintos para presentar subtotales, IVA y tipos de moneda.
+        \item \textbf{Cálculos Cambiarios Tediosos:} Las conversiones entre USD, EUR y MXN requieren revisar manualmente el tipo de cambio oficial al día.
+    \end{itemize}
+\end{frame}
+
+% ── Diapositiva 3: Nuestra Solución ──
+\begin{frame}{Nuestra Solución: Conciliador v6.1}
+    Desarrollamos una \textbf{aplicación de escritorio nativa} (PyQt6) robusta y autosuficiente.
+    
+    \vspace{0.5cm}
+    \begin{columns}
+        \column{0.5\textwidth}
+        \textbf{¿Qué logra?}
+        \begin{itemize}
+            \item Lee archivos PDF automáticamente.
+            \item Extrae cantidades, rubros e IVA de forma inteligente.
+            \item Agrupa varias cotizaciones en un único flujo de trabajo.
+            \item Genera reportes en Excel listos para la conciliación manual final.
+        \end{itemize}
+        
+        \column{0.5\textwidth}
+        \begin{center}
+            \colorbox{vino!10}{
+                \parbox{0.9\textwidth}{
+                \centering \textbf{\color{vino}Impacto Directo:}\\
+                Reducción del 80\% del tiempo de transcripción y 0\% de errores tipográficos en la extracción.
+                }
+            }
+        \end{center}
+    \end{columns}
+\end{frame}
+
+% ── Diapositiva 4: Características Principales ──
+\begin{frame}{Características Técnicas Principales}
+    \begin{enumerate}[<+->]
+        \item \textbf{5 Estrategias de Análisis PDF:} Búsqueda de tablas estructuradas, barrido por texto, extracción geométrica de palabras clave y Motor OCR (Reconocimiento Óptico) opcional.
+        \item \textbf{API Banxico Integrada:} Consulta automática del tipo de cambio oficial al día (Serie SF43718, etc.) vía REST API sin salir de la app.
+        \item \textbf{Auditoría y Trazabilidad:} Calcula un código MD5 único (Hash) que fusiona y sella digitalmente los PDFs para probar su integridad y autenticidad.
+        \item \textbf{Exportación Inteligente:} Plantillas Excel pre-configuradas con diseño corporativo y fórmulas integradas listas para imprimir (Tamaño Carta, Vertical).
+    \end{enumerate}
+\end{frame}
+
+% ── Diapositiva 5: Demostración de Interfaz ──
+\begin{frame}{Flujo de Trabajo (Interfaz)}
+    \begin{center}
+        \colorbox{vino}{\color{white} 1. Cargar PDFs} $\rightarrow$
+        \colorbox{vino}{\color{white} 2. Seleccionar Páginas} $\rightarrow$
+        \colorbox{vino}{\color{white} 3. Extraer Montos} $\rightarrow$
+        \colorbox{vino}{\color{white} 4. Validar} $\rightarrow$
+        \colorbox{vino}{\color{white} 5. Exportar}
+    \end{center}
+    \vspace{0.4cm}
+    \begin{itemize}
+        \item \textbf{Visor Integrado:} Permite hojear los PDFs lado a lado con los datos extraídos.
+        \item \textbf{Recálculo en Vivo:} La tabla recalcula el IVA y el Subtotal en tiempo real si el usuario decide modificar alguna cantidad manualmente.
+        \item \textbf{Gestión de Memoria Segura:} Agrega y quita secciones de proveedores sin perder datos que ya fueron extraídos.
+    \end{itemize}
+\end{frame}
+
+% ── Diapositiva 6: Cierre ──
+\begin{frame}
+    \begin{center}
+        \Huge \textcolor{vino}{\textbf{¡Gracias!}}
+        
+        \vspace{1cm}
+        \Large \textbf{¿Tienen alguna pregunta?}
+        
+        \vspace{1cm}
+        \normalsize Secretaría de Hacienda y Crédito Público (SHCP)\\
+        Unidad de Productividad e Innovación Tecnológica (UPIT)
+    \end{center}
+\end{frame}
+
+\end{document}

@@ -9,10 +9,10 @@ import sys
 
 import pandas as pd
 from PyQt6.QtCore import (
-    QByteArray, QSize, Qt, QThread, pyqtSignal,
+    QByteArray, QSize, Qt, QThread, pyqtSignal, QEvent
 )
 from PyQt6.QtGui import (
-    QColor, QFont, QIcon, QPalette, QPixmap,
+    QColor, QFont, QIcon, QPalette, QPixmap, QTransform
 )
 from PyQt6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QDialog,
@@ -22,6 +22,7 @@ from PyQt6.QtWidgets import (
     QPushButton, QScrollArea, QSizePolicy, QSpinBox,
     QSplitter, QStackedWidget, QStatusBar, QTableWidget,
     QTableWidgetItem, QTextEdit, QVBoxLayout, QWidget,
+    QGraphicsView, QGraphicsScene, QGraphicsPixmapItem,
 )
 
 import engine
@@ -29,17 +30,18 @@ import engine
 # ─────────────────────────────────────────────────────────────
 # PALETA DE COLORES
 # ─────────────────────────────────────────────────────────────
-ACCENT      = "#6E152E"
-ACCENT_LITE = "#b84a6b"
-BG_DARK     = "#111217"
-BG_PANEL    = "#1d1519"
-BG_SIDEBAR  = "#2a0f1a"
-TEXT_MAIN   = "#f2edf0"
-TEXT_MUTED  = "#d8a8b7"
-BORDER      = "#5b2637"
-INPUT_BG    = "#2b2026"
-GREEN       = "#28a745"
-RED_WARN    = "#c0392b"
+ACCENT      = "#FF4B4B"  # Streamlit Primary Red
+ACCENT_LITE = "#ff7676"
+BANNER_BG   = "#B84A6B"  # Magenta headers from screenshot
+BG_DARK     = "#0E1117"  # Streamlit main background
+BG_PANEL    = "#0E1117"  # Streamlit main background
+BG_SIDEBAR  = "#262730"  # Streamlit secondary background
+TEXT_MAIN   = "#FAFAFA"
+TEXT_MUTED  = "#A3A8B8"
+BORDER      = "#707482"  # Lighter border to stand out
+INPUT_BG    = "#262730"
+GREEN       = "#09ab3b"
+RED_WARN    = "#ff2b2b"
 
 QSS = f"""
 QMainWindow, QWidget {{
@@ -57,23 +59,33 @@ QSplitter::handle {{
     background-color: {BG_SIDEBAR};
     border-right: 1px solid {BORDER};
 }}
+QWidget#sidebar {{
+    background-color: {BG_SIDEBAR};
+    border-right: 1px solid {BORDER};
+}}
+QWidget#main_banner {{
+    background-color: {BANNER_BG};
+    border-radius: 6px;
+}}
+QWidget#main_banner QLabel {{
+    background-color: transparent;
+}}
 /* ── Paneles interiores ── */
 QGroupBox {{
     border: 1px solid {BORDER};
     border-radius: 6px;
-    margin-top: 8px;
-    padding-top: 8px;
+    margin-top: 14px;
+    padding-top: 10px;
     color: {TEXT_MAIN};
-    font-weight: bold;
 }}
 QGroupBox::title {{
     subcontrol-origin: margin;
     left: 10px;
+    top: 0px;
     color: {TEXT_MUTED};
     font-size: 11px;
     font-weight: bold;
     text-transform: uppercase;
-    letter-spacing: 1px;
 }}
 /* ── Inputs ── */
 QLineEdit, QSpinBox, QComboBox, QTextEdit {{
@@ -82,6 +94,15 @@ QLineEdit, QSpinBox, QComboBox, QTextEdit {{
     border: 1px solid {BORDER};
     border-radius: 4px;
     padding: 4px 8px;
+    min-height: 22px;
+}}
+QSpinBox::up-button, QSpinBox::down-button {{
+    background-color: {TEXT_MUTED};
+    width: 16px;
+    border-radius: 2px;
+}}
+QSpinBox::up-button:hover, QSpinBox::down-button:hover {{
+    background-color: {TEXT_MAIN};
 }}
 QLineEdit:focus, QSpinBox:focus, QComboBox:focus {{
     border: 1px solid {ACCENT_LITE};
@@ -94,15 +115,59 @@ QComboBox QAbstractItemView {{
 }}
 /* ── Botones ── */
 QPushButton {{
-    background-color: {INPUT_BG};
+    background-color: #4A4D59;
     color: {TEXT_MAIN};
     border: 1px solid {BORDER};
     border-radius: 4px;
     padding: 6px 14px;
     font-weight: 500;
+    min-height: 24px;
 }}
-QPushButton:hover  {{ background-color: {BORDER}; }}
+QPushButton:hover  {{ border: 1px solid {ACCENT}; color: {ACCENT}; background-color: #5C5F6D; }}
 QPushButton:pressed {{ background-color: {ACCENT}; color: #fff; }}
+
+QPushButton#expander_btn {{
+    text-align: left;
+    background-color: transparent;
+    border: none;
+    padding: 8px 10px;
+    font-weight: 600;
+    font-size: 13px;
+    color: {TEXT_MAIN};
+    border-radius: 4px;
+}}
+QPushButton#expander_btn:hover {{
+    color: {ACCENT};
+    background-color: rgba(255, 75, 75, 0.1);
+}}
+QWidget#expander_content {{
+    border-top: 1px solid {BORDER};
+    background-color: transparent;
+}}
+QWidget#section_widget {{
+    border: 1px solid {BORDER};
+    border-radius: 6px;
+    background-color: {INPUT_BG};
+    margin-bottom: 8px;
+}}
+
+QPushButton#viewer_btn {{
+    background-color: #3C3F4D;
+    color: #FAFAFA;
+    border: 1px solid #707482;
+    border-radius: 4px;
+    padding: 2px;
+    font-size: 14px;
+    font-weight: bold;
+    min-width: 30px;
+    min-height: 24px;
+}}
+QPushButton#viewer_btn:hover {{
+    background-color: #5C5F6D;
+    border: 1px solid #FF4B4B;
+    color: #FF4B4B;
+}}
+
 QPushButton#btn_primary {{
     background-color: {ACCENT};
     color: #ffffff;
@@ -110,25 +175,29 @@ QPushButton#btn_primary {{
     border: none;
     padding: 8px 18px;
 }}
-QPushButton#btn_primary:hover  {{ background-color: {ACCENT_LITE}; }}
+QPushButton#btn_primary:hover  {{ background-color: {ACCENT_LITE}; border: none; color: #ffffff; }}
 QPushButton#btn_primary:pressed {{ background-color: {ACCENT}; }}
 QPushButton#btn_primary:disabled {{
-    background-color: #4a2030;
-    color: #8a5060;
+    background-color: #5C2828;
+    color: #A3A8B8;
 }}
 /* ── Tabla ── */
 QTableWidget {{
     background-color: {BG_PANEL};
     color: {TEXT_MAIN};
-    gridline-color: {BORDER};
+    gridline-color: transparent;
     border: 1px solid {BORDER};
     selection-background-color: {ACCENT};
 }}
+QTableWidget::item {{
+    border-bottom: 1px solid {BORDER};
+}}
 QTableWidget::item:selected {{ background-color: {ACCENT}; color: #fff; }}
 QHeaderView::section {{
-    background-color: {BG_SIDEBAR};
+    background-color: {BG_DARK};
     color: {TEXT_MUTED};
-    border: 1px solid {BORDER};
+    border: none;
+    border-bottom: 1px solid {BORDER};
     padding: 4px 6px;
     font-size: 11px;
     font-weight: bold;
@@ -146,26 +215,44 @@ QProgressBar {{
 QProgressBar::chunk {{ background-color: {ACCENT}; border-radius: 3px; }}
 /* ── Scroll ── */
 QScrollBar:vertical {{
-    background: {BG_PANEL}; width: 10px; border-radius: 4px;
+    background: transparent;
+    width: 10px;
+    margin: 0px;
 }}
 QScrollBar::handle:vertical {{
-    background: {BORDER}; border-radius: 4px; min-height: 20px;
+    background: #555555;
+    min-height: 20px;
+    border-radius: 5px;
 }}
-QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+    height: 0px;
+}}
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{
+    background: none;
+}}
 QScrollBar:horizontal {{
-    background: {BG_PANEL}; height: 10px; border-radius: 4px;
+    background: transparent;
+    height: 10px;
+    margin: 0px;
 }}
 QScrollBar::handle:horizontal {{
-    background: {BORDER}; border-radius: 4px; min-width: 20px;
+    background: #555555;
+    min-width: 20px;
+    border-radius: 5px;
 }}
-QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{ width: 0; }}
-/* ── Labels de título ── */
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
+    width: 0px;
+}}
+QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {{
+    background: none;
+}}
+/* ── Títulos de Sección ── */
 QLabel#section_title {{
-    background-color: {ACCENT};
+    background-color: {BANNER_BG};
     color: #ffffff;
     font-weight: bold;
-    padding: 6px 12px;
-    border-radius: 4px 4px 0 0;
+    padding: 8px 12px;
+    border-radius: 6px;
 }}
 QLabel#kpi_value {{
     font-size: 18px;
@@ -262,13 +349,15 @@ class ExtractWorker(QThread):
                     cfg["det_iva"],
                     cfg.get("calc_sub", True),
                     tipo=cfg.get("tipo", "Cotización Proveedor"),
-                    moneda=cfg.get("moneda", "MXN"),
+                    moneda=cfg.get("moneda", "AUTO"),
                     bx_token=self._token,
+                    sec_num=i + 1,
                     on_warning=lambda m: self.warning.emit(m),
                 )
             except Exception as exc:
                 row = {
                     **{k: None for k in engine._COLS},
+                    "Nº Sec": i + 1,
                     "Tipo":   cfg.get("tipo", "Cotización Proveedor"),
                     "Rubro":  cfg["label"],
                     "QT":     "Sí",
@@ -286,67 +375,117 @@ class ExtractWorker(QThread):
 # ─────────────────────────────────────────────────────────────
 # WIDGET DE SECCIÓN (barra lateral)
 # ─────────────────────────────────────────────────────────────
-class SectionWidget(QGroupBox):
+class SectionWidget(QWidget):
     changed = pyqtSignal()
+    delete_requested = pyqtSignal(object)
 
     def __init__(self, idx: int, pdf_names: list[str], max_pages: list[int], parent=None):
-        super().__init__(f"Sección {idx + 1}", parent)
+        super().__init__(parent)
+        self.setObjectName("section_widget")
         self._idx = idx
         self._pdf_names = pdf_names
         self._max_pages = max_pages
         self._build()
 
     def _build(self):
-        layout = QFormLayout(self)
-        layout.setSpacing(6)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        
+        # Botón Colapsable y Eliminar
+        top_row = QHBoxLayout()
+        top_row.setContentsMargins(0, 0, 0, 0)
+        top_row.setSpacing(4)
+        
+        self.btn_toggle = QPushButton(f"  >   📄 Sección {self._idx + 1}")
+        self.btn_toggle.setCheckable(True)
+        self.btn_toggle.setChecked(False) # Colapsado por defecto
+        self.btn_toggle.setObjectName("expander_btn")
+        self.btn_toggle.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_toggle.clicked.connect(self._toggle)
+        
+        self.btn_delete = QPushButton("🗑️")
+        self.btn_delete.setFixedWidth(32)
+        self.btn_delete.setObjectName("viewer_btn")
+        self.btn_delete.clicked.connect(lambda: self.delete_requested.emit(self))
+        self.btn_delete.setToolTip("Eliminar sección")
+        
+        top_row.addWidget(self.btn_toggle, stretch=1)
+        top_row.addWidget(self.btn_delete)
+        layout.addLayout(top_row)
+        
+        # Contenedor de Formulario
+        self.container = QWidget()
+        self.container.setObjectName("expander_content")
+        self.container.setVisible(False)
+        clayout = QVBoxLayout(self.container)
+        clayout.setContentsMargins(14, 14, 14, 14)
+        clayout.setSpacing(12)
 
+        lbl_style = "font-size: 11px; font-weight: bold; color: #A3A8B8;"
+
+        # Rubro
+        lbl_rubro = QLabel("Rubro / Concepto")
+        lbl_rubro.setStyleSheet(lbl_style)
         self.le_label = QLineEdit(f"Sección {self._idx + 1}")
-        self.le_label.setPlaceholderText("Rubro / Concepto")
-        layout.addRow("Rubro:", self.le_label)
+        clayout.addWidget(lbl_rubro)
+        clayout.addWidget(self.le_label)
 
+        # Tipo
+        lbl_tipo = QLabel("Tipo")
+        lbl_tipo.setStyleSheet(lbl_style)
         self.cb_tipo = QComboBox()
         self.cb_tipo.addItems(["Cotización Proveedor", "Presupuesto Global"])
-        layout.addRow("Tipo:", self.cb_tipo)
+        clayout.addWidget(lbl_tipo)
+        clayout.addWidget(self.cb_tipo)
 
+        # PDF
+        self.lbl_pdf = QLabel("PDF")
+        self.lbl_pdf.setStyleSheet(lbl_style)
         self.cb_pdf = QComboBox()
         if self._pdf_names:
             self.cb_pdf.addItems(self._pdf_names)
         else:
             self.cb_pdf.addItem("(sin PDF)")
-        self.cb_pdf.setVisible(len(self._pdf_names) > 1)
-        layout.addRow("PDF:", self.cb_pdf)
+        clayout.addWidget(self.lbl_pdf)
+        clayout.addWidget(self.cb_pdf)
+        has_multi = len(self._pdf_names) > 1
+        self.lbl_pdf.setVisible(has_multi)
+        self.cb_pdf.setVisible(has_multi)
 
+        # Páginas
         h_pages = QHBoxLayout()
+        v_p0 = QVBoxLayout(); v_p0.setContentsMargins(0,0,0,0); v_p0.setSpacing(4)
+        v_p1 = QVBoxLayout(); v_p1.setContentsMargins(0,0,0,0); v_p1.setSpacing(4)
+        lbl_p0 = QLabel("Pág. Inicio"); lbl_p0.setStyleSheet(lbl_style)
+        lbl_p1 = QLabel("Pág. Fin");    lbl_p1.setStyleSheet(lbl_style)
         self.sb_p0 = QSpinBox(); self.sb_p0.setMinimum(1)
         self.sb_p1 = QSpinBox(); self.sb_p1.setMinimum(1)
         self._update_max_pages()
-        h_pages.addWidget(QLabel("De:")); h_pages.addWidget(self.sb_p0)
-        h_pages.addWidget(QLabel("A:"));  h_pages.addWidget(self.sb_p1)
-        layout.addRow("Págs.:", h_pages)
+        v_p0.addWidget(lbl_p0); v_p0.addWidget(self.sb_p0)
+        v_p1.addWidget(lbl_p1); v_p1.addWidget(self.sb_p1)
+        h_pages.addLayout(v_p0); h_pages.addLayout(v_p1)
+        clayout.addLayout(h_pages)
 
-        self.cb_moneda = QComboBox()
-        self.cb_moneda.addItems(["MXN", "USD", "EUR", "CAD"])
-        layout.addRow("Moneda:", self.cb_moneda)
-
-        self.chk_iva = QCheckBox("Detectar IVA")
-        self.chk_iva.setChecked(True)
-        self.chk_sub = QCheckBox("Calcular subtotal si falta")
-        self.chk_sub.setChecked(True)
-        layout.addRow("", self.chk_iva)
-        layout.addRow("", self.chk_sub)
+        layout.addWidget(self.container)
 
         # Propagar cambios
-        for w in (self.le_label, self.cb_tipo, self.cb_pdf,
-                  self.cb_moneda):
+        for w in (self.le_label, self.cb_tipo, self.cb_pdf):
             if hasattr(w, "textChanged"):
                 w.textChanged.connect(self.changed)
             elif hasattr(w, "currentIndexChanged"):
                 w.currentIndexChanged.connect(self.changed)
         for w in (self.sb_p0, self.sb_p1):
             w.valueChanged.connect(self.changed)
-        self.chk_iva.toggled.connect(self.changed)
-        self.chk_sub.toggled.connect(self.changed)
         self.cb_pdf.currentIndexChanged.connect(self._on_pdf_changed)
+
+    def _toggle(self, checked):
+        if checked:
+            self.btn_toggle.setText(f"  v   📄 Sección {self._idx + 1}")
+            self.container.setVisible(True)
+        else:
+            self.btn_toggle.setText(f"  >   📄 Sección {self._idx + 1}")
+            self.container.setVisible(False)
 
     def _update_max_pages(self):
         pdf_idx = self.cb_pdf.currentIndex() if self._pdf_names else 0
@@ -365,9 +504,8 @@ class SectionWidget(QGroupBox):
             "pdf_idx":  self.cb_pdf.currentIndex(),
             "p0":       self.sb_p0.value(),
             "p1":       self.sb_p1.value(),
-            "moneda":   self.cb_moneda.currentText(),
-            "det_iva":  self.chk_iva.isChecked(),
-            "calc_sub": self.chk_sub.isChecked(),
+            "det_iva":  True,
+            "calc_sub": True,
         }
 
     def update_pdf_names(self, pdf_names: list[str], max_pages: list[int]):
@@ -390,6 +528,7 @@ class SectionWidget(QGroupBox):
 class ConfigPanel(QWidget):
     extract_requested = pyqtSignal(list, str)  # (sec_configs, bx_token)
     pdf_loaded        = pyqtSignal()
+    section_deleted   = pyqtSignal(str)        # Emite el label de la sección eliminada
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -413,11 +552,12 @@ class ConfigPanel(QWidget):
             Qt.ScrollBarPolicy.ScrollBarAlwaysOff
         )
         self._panel_scroll.setStyleSheet(
-            f"background:{BG_SIDEBAR}; border:none;"
+            f"QScrollArea {{ background:{BG_SIDEBAR}; border:none; }}"
         )
 
         _content = QWidget()
-        _content.setStyleSheet(f"background:{BG_SIDEBAR};")
+        _content.setObjectName("sidebar_content")
+        _content.setStyleSheet(f"QWidget#sidebar_content {{ background:{BG_SIDEBAR}; }}")
         main = QVBoxLayout(_content)
         main.setContentsMargins(10, 10, 10, 10)
         main.setSpacing(12)
@@ -475,6 +615,12 @@ class ConfigPanel(QWidget):
         self.lbl_token_status = QLabel("")
         self.lbl_token_status.setStyleSheet(f"color:{TEXT_MUTED}; font-size:11px;")
         fl2.addRow("", self.lbl_token_status)
+        
+        self.lbl_token_link = QLabel('<a href="https://www.banxico.org.mx/SieAPIRest/service/v1/token" style="color: #63b3ed; text-decoration: none;">Obtener Token en Banxico</a>')
+        self.lbl_token_link.setOpenExternalLinks(True)
+        self.lbl_token_link.setStyleSheet("font-size: 11px;")
+        fl2.addRow("", self.lbl_token_link)
+        
         self.le_token.textChanged.connect(
             lambda t: self.lbl_token_status.setText("🔑 Token activo" if t else "")
         )
@@ -483,17 +629,17 @@ class ConfigPanel(QWidget):
         # ── Secciones ─────────────────────────────────────────
         grp_sec = QGroupBox("Secciones (Cotizaciones)")
         vl_sec = QVBoxLayout(grp_sec)
+        
+        lbl_nsec = QLabel("Número de secciones")
+        lbl_nsec.setStyleSheet("font-size: 11px; font-weight: bold; color: #A3A8B8;")
+        vl_sec.addWidget(lbl_nsec)
 
-        h_spin = QHBoxLayout()
-        h_spin.addWidget(QLabel("Núm. de secciones:"))
         self.sb_nsec = QSpinBox()
         self.sb_nsec.setRange(1, 50)
         self.sb_nsec.setValue(1)
-        self.sb_nsec.setMinimumWidth(64)   # ancho mínimo para ser clickeable
+        self.sb_nsec.setMinimumWidth(64)
         self.sb_nsec.valueChanged.connect(self._rebuild_sections)
-        h_spin.addWidget(self.sb_nsec)
-        h_spin.addStretch()
-        vl_sec.addLayout(h_spin)
+        vl_sec.addWidget(self.sb_nsec)
 
         # Sin scroll anidado — el panel completo ya scrollea verticalmente
         self._sec_container = QWidget()
@@ -533,6 +679,7 @@ class ConfigPanel(QWidget):
             # Solo agregar los nuevos al final
             for i in range(current_n, n):
                 sw = SectionWidget(i, names, pages)
+                sw.delete_requested.connect(self._remove_section)
                 self._sec_layout.insertWidget(i, sw)
                 self._sec_widgets.append(sw)
         else:
@@ -541,6 +688,20 @@ class ConfigPanel(QWidget):
                 w = self._sec_widgets.pop()
                 self._sec_layout.removeWidget(w)
                 w.deleteLater()
+
+    def _remove_section(self, sw: SectionWidget):
+        label = sw.le_label.text().strip()
+        if sw in self._sec_widgets:
+            self._sec_widgets.remove(sw)
+            self._sec_layout.removeWidget(sw)
+            sw.deleteLater()
+            
+            # Ajustar el spinbox sin disparar _rebuild_sections
+            self.sb_nsec.blockSignals(True)
+            self.sb_nsec.setValue(len(self._sec_widgets))
+            self.sb_nsec.blockSignals(False)
+            
+            self.section_deleted.emit(label)
 
     def _open_pdfs(self):
         paths, _ = QFileDialog.getOpenFileNames(
@@ -593,8 +754,33 @@ class ConfigPanel(QWidget):
         # Actualizar secciones
         names = self._pdf_names()
         pages = self._max_pages()
-        for sw in self._sec_widgets:
-            sw.update_pdf_names(names, pages)
+        
+        if n > 0:
+            self.sb_nsec.setValue(n)
+            for i, sw in enumerate(self._sec_widgets):
+                sw.update_pdf_names(names, pages)
+                if i < n:
+                    # Mapear 1 a 1
+                    sw.cb_pdf.setCurrentIndex(i)
+                    
+                    # Auto-completar Rubro
+                    fname = names[i]
+                    fname_clean = fname[:-4] if fname.lower().endswith('.pdf') else fname
+                    sw.le_label.setText(fname_clean)
+                    
+                    # Inferir Tipo
+                    if "PRESUPUESTO" in fname.upper():
+                        sw.cb_tipo.setCurrentText("Presupuesto Global")
+                    else:
+                        sw.cb_tipo.setCurrentText("Cotización Proveedor")
+                        
+                    # Auto-completar páginas
+                    sw.sb_p0.setValue(1)
+                    sw.sb_p1.setValue(pages[i])
+        else:
+            self.sb_nsec.setValue(1)
+            for sw in self._sec_widgets:
+                sw.update_pdf_names(names, pages)
 
     def _on_extract(self):
         cfgs = [sw.get_config() for sw in self._sec_widgets]
@@ -620,6 +806,8 @@ class PDFViewer(QWidget):
         self._current_page: int      = 0
         self._page_cache: dict[int, QPixmap] = {}
         self._render_worker: RenderWorker | None = None
+        self._zoom_level = 1.0
+        self._rotation_angle = 0
         self._build()
 
     def _build(self):
@@ -636,6 +824,7 @@ class PDFViewer(QWidget):
         nav = QHBoxLayout()
         self.btn_prev = QPushButton("◀")
         self.btn_prev.setFixedWidth(40)
+        self.btn_prev.setObjectName("viewer_btn")
         self.btn_prev.clicked.connect(lambda: self._go_to(self._current_page - 1))
 
         self.lbl_page = QLabel("Página 0 / 0")
@@ -648,12 +837,46 @@ class PDFViewer(QWidget):
 
         self.btn_next = QPushButton("▶")
         self.btn_next.setFixedWidth(40)
+        self.btn_next.setObjectName("viewer_btn")
         self.btn_next.clicked.connect(lambda: self._go_to(self._current_page + 1))
+        
+        # Herramientas de vista
+        self.btn_zoom_out = QPushButton("➖")
+        self.btn_zoom_out.setFixedWidth(30)
+        self.btn_zoom_out.setObjectName("viewer_btn")
+        self.btn_zoom_out.clicked.connect(self._zoom_out)
+        
+        self.btn_zoom_reset = QPushButton("1:1")
+        self.btn_zoom_reset.setFixedWidth(36)
+        self.btn_zoom_reset.setObjectName("viewer_btn")
+        self.btn_zoom_reset.clicked.connect(self._zoom_reset)
+        
+        self.btn_zoom_in = QPushButton("➕")
+        self.btn_zoom_in.setFixedWidth(30)
+        self.btn_zoom_in.setObjectName("viewer_btn")
+        self.btn_zoom_in.clicked.connect(self._zoom_in)
+        
+        self.btn_rotate_left = QPushButton("⟲")
+        self.btn_rotate_left.setFixedWidth(30)
+        self.btn_rotate_left.setObjectName("viewer_btn")
+        self.btn_rotate_left.clicked.connect(self._rotate_left)
+        
+        self.btn_rotate_right = QPushButton("⟳")
+        self.btn_rotate_right.setFixedWidth(30)
+        self.btn_rotate_right.setObjectName("viewer_btn")
+        self.btn_rotate_right.clicked.connect(self._rotate_right)
 
         nav.addWidget(self.btn_prev)
         nav.addWidget(self.lbl_page, stretch=1)
         nav.addWidget(self.sb_jump)
         nav.addWidget(self.btn_next)
+        nav.addSpacing(10)
+        nav.addWidget(self.btn_zoom_out)
+        nav.addWidget(self.btn_zoom_reset)
+        nav.addWidget(self.btn_zoom_in)
+        nav.addSpacing(4)
+        nav.addWidget(self.btn_rotate_left)
+        nav.addWidget(self.btn_rotate_right)
         layout.addLayout(nav)
 
         # Indicador de sección
@@ -665,19 +888,21 @@ class PDFViewer(QWidget):
         self.lbl_section.setVisible(False)
         layout.addWidget(self.lbl_section)
 
-        # Área de imagen
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.lbl_image = QLabel("Carga un PDF para comenzar")
-        self.lbl_image.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.lbl_image.setStyleSheet(f"color:{TEXT_MUTED};")
-        self.lbl_image.setMinimumSize(400, 300)
-        scroll.setWidget(self.lbl_image)
-        layout.addWidget(scroll, stretch=1)
+        # Área de imagen con QGraphicsView
+        self.scene = QGraphicsScene(self)
+        self.view = QGraphicsView(self.scene)
+        self.view.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
+        self.view.setStyleSheet(f"background:{BG_DARK}; border:none;")
+        self.pixmap_item = QGraphicsPixmapItem()
+        self.scene.addItem(self.pixmap_item)
+        layout.addWidget(self.view, stretch=1)
 
-        self._scroll = scroll
         self._nav_blocked = False
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if hasattr(self, '_zoom_level') and getattr(self, '_zoom_level', 1.0) == 1.0:
+            self._refresh_current_view()
 
     def load_pdf(self, pdf_bytes: bytes, total_pages: int):
         self._pdf_bytes   = pdf_bytes
@@ -693,8 +918,7 @@ class PDFViewer(QWidget):
         self._total_pages = 0
         self._current_page = 0
         self._page_cache.clear()
-        self.lbl_image.setPixmap(QPixmap())
-        self.lbl_image.setText("Carga un PDF para comenzar")
+        self.pixmap_item.setPixmap(QPixmap())
         self._update_nav()
 
     def _go_to(self, target: int):
@@ -711,7 +935,6 @@ class PDFViewer(QWidget):
         if target in self._page_cache:
             self._show_pixmap(self._page_cache[target])
         else:
-            self.lbl_image.setText("Cargando…")
             self._request_render(target)
         self.page_changed.emit(target)
 
@@ -737,7 +960,7 @@ class PDFViewer(QWidget):
         # el resultado se cachea aunque ya no sea la página visible.
         worker = RenderWorker(self._pdf_bytes, idx, scale=1.5)
         worker.finished.connect(self._on_rendered)
-        worker.failed.connect(lambda i: self.lbl_image.setText(f"Error al renderizar pág. {i + 1}"))
+        worker.failed.connect(lambda i: print(f"Error al renderizar pág. {i + 1}"))
         # Guardar referencia para evitar GC prematuro
         if self._render_worker is not None:
             # No matamos el worker anterior, sólo actualizamos la referencia
@@ -753,10 +976,54 @@ class PDFViewer(QWidget):
             self._show_pixmap(pm)
 
     def _show_pixmap(self, pm: QPixmap):
-        avail_w = self._scroll.viewport().width() - 10
-        scaled = pm.scaledToWidth(avail_w, Qt.TransformationMode.SmoothTransformation)
-        self.lbl_image.setPixmap(scaled)
-        self.lbl_image.resize(scaled.size())
+        if pm is None or pm.isNull():
+            return
+            
+        # Rotar la imagen primero
+        if self._rotation_angle != 0:
+            transform = QTransform().rotate(self._rotation_angle)
+            pm = pm.transformed(transform, Qt.TransformationMode.SmoothTransformation)
+            
+        self.pixmap_item.setPixmap(pm)
+        self.scene.setSceneRect(self.pixmap_item.boundingRect())
+        
+        # Reset transform and re-apply
+        self.view.resetTransform()
+        
+        # Apply zoom (1.0 = fit to width initially)
+        if self._zoom_level == 1.0:
+            self.view.fitInView(self.scene.sceneRect(), Qt.AspectRatioMode.KeepAspectRatio)
+            # Store the actual scale factor that was applied
+            self._base_transform = self.view.transform()
+        else:
+            if hasattr(self, "_base_transform"):
+                self.view.setTransform(self._base_transform)
+            self.view.scale(self._zoom_level, self._zoom_level)
+        
+    def _zoom_in(self):
+        self._zoom_level = min(self._zoom_level + 0.25, 3.0)
+        self._refresh_current_view()
+        
+    def _zoom_out(self):
+        self._zoom_level = max(self._zoom_level - 0.25, 0.25)
+        self._refresh_current_view()
+        
+    def _zoom_reset(self):
+        self._zoom_level = 1.0
+        self._rotation_angle = 0
+        self._refresh_current_view()
+        
+    def _rotate_left(self):
+        self._rotation_angle = (self._rotation_angle - 90) % 360
+        self._refresh_current_view()
+        
+    def _rotate_right(self):
+        self._rotation_angle = (self._rotation_angle + 90) % 360
+        self._refresh_current_view()
+        
+    def _refresh_current_view(self):
+        if self._current_page in self._page_cache:
+            self._show_pixmap(self._page_cache[self._current_page])
 
     def set_section_label(self, text: str):
         if text:
@@ -776,14 +1043,15 @@ DROPDOWN_COLS = {
     "Tipo":    ["Cotización Proveedor", "Presupuesto Global"],
     "QT":      ["Sí", "No"],
     "(+ IVA)": ["Sí", "Incluido", "Exento", "N/M"],
+    "T. Cambio": ["MXN", "USD", "EUR", "CAD"],
 }
-READONLY_COLS  = {"Diferencia final"}
+READONLY_COLS  = {"Nº Sec", "Sección", "Diferencia final"}
 MONEY_COLS     = {"Precio Unitario", "Subtotal (Sin IVA)", "IVA 16%",
                   "Total con IVA", "Diferencia final", "Monto en Anexo Escrito"}
 NUMERIC_COLS   = {"Cantidad"} | MONEY_COLS
 
 COL_WIDTHS = {
-    "Tipo": 160, "Fecha": 90, "Rubro": 200, "QT": 50,
+    "Nº Sec": 60, "Sección": 90, "Tipo": 160, "Fecha": 90, "Rubro": 200, "QT": 50,
     "T. Cambio": 80, "(+ IVA)": 75, "Cantidad": 65,
     "Precio Unitario": 110, "Subtotal (Sin IVA)": 120, "IVA 16%": 90,
     "Total con IVA": 110, "Diferencia final": 110,
@@ -796,7 +1064,11 @@ class DataPanel(QWidget):
         super().__init__(parent)
         self._df: pd.DataFrame | None = None
         self._updating = False
+        self._manual_edits: set[tuple[int, str]] = set()
         self._build()
+
+    def get_current_state(self):
+        return self._df, self._manual_edits
 
     def _build(self):
         layout = QVBoxLayout(self)
@@ -892,11 +1164,13 @@ class DataPanel(QWidget):
         vl.addWidget(lbl)
         return box, val_lbl, lbl
 
-    def load_data(self, df: pd.DataFrame, proyecto: str = ""):
+    def load_data(self, df: pd.DataFrame, proyecto: str = "", token: str = ""):
         self._df = df.copy()
         self._proyecto = proyecto
+        self._token = token
         self._updating = True
-        self._populate_table(df)
+        self._manual_edits = {(r, c) for (r, c) in self._manual_edits if r < len(self._df)}
+        self._populate_table(self._df)
         self._updating = False
         self._refresh_kpis()
         self.btn_export.setEnabled(True)
@@ -904,6 +1178,16 @@ class DataPanel(QWidget):
         self.lbl_placeholder.setVisible(False)
         self.table.setVisible(True)
         self._check_warnings()
+
+    def remove_section_row(self, label: str):
+        if self._df is None or "Sección" not in self._df.columns:
+            return
+            
+        idx_to_drop = self._df[self._df["Sección"] == label].index
+        if not idx_to_drop.empty:
+            self._df = self._df.drop(idx_to_drop).reset_index(drop=True)
+            self._manual_edits.clear()
+            self.load_data(self._df, getattr(self, "_proyecto", ""), getattr(self, "_token", ""))
 
     def _populate_table(self, df: pd.DataFrame):
         self.table.setRowCount(0)
@@ -942,8 +1226,53 @@ class DataPanel(QWidget):
         if self._updating or self._df is None:
             return
         col = engine._COLS[ci]
-        self._df.at[r, col] = cb.currentText()
-        self._recalc_and_refresh_row(r)
+        self._manual_edits.add((r, col))
+        old_val = self._df.at[r, col]
+        new_val = cb.currentText()
+        self._df.at[r, col] = new_val
+        if col == "(+ IVA)":
+            self._recalc_and_refresh_row(r)
+        elif col == "T. Cambio" and str(old_val) != str(new_val):
+            self._recalc_currency(r, str(old_val), str(new_val))
+        else:
+            self._refresh_kpis()
+
+    def _recalc_currency(self, r: int, old_curr: str, new_curr: str):
+        if not hasattr(self, "_token") or not self._token:
+            self.lbl_warnings.setText(f"⚠️ Se detectó cambio a {new_curr} pero se requiere el Token Banxico para hacer la conversión matemática.")
+            self.lbl_warnings.setVisible(True)
+            return
+            
+        import datetime
+        from engine import banxico_tc
+        
+        fecha_str = self._df.at[r, "Fecha"]
+        try:
+            d_obj = datetime.date.fromisoformat(str(fecha_str).strip()[:10])
+        except (ValueError, TypeError):
+            d_obj = datetime.date.today()
+            
+        factor = 1.0
+        
+        # Revertir a MXN base si la vieja moneda tenía tasa
+        if old_curr != "MXN":
+            old_tc = banxico_tc(old_curr, d_obj, self._token)
+            if old_tc:
+                factor /= old_tc
+                
+        # Aplicar nueva tasa si la nueva moneda no es MXN
+        if new_curr != "MXN":
+            new_tc = banxico_tc(new_curr, d_obj, self._token)
+            if new_tc:
+                factor *= new_tc
+                
+        if factor != 1.0:
+            pu  = self._df.at[r, "Precio Unitario"]
+            if pd.notna(pu):
+                self._df.at[r, "Precio Unitario"] = round(float(pu) * factor, 2)
+            self._recalc_and_refresh_row(r)
+        else:
+            self._refresh_kpis()
 
     def _on_item_changed(self, item: QTableWidgetItem):
         if self._updating or self._df is None:
@@ -953,6 +1282,9 @@ class DataPanel(QWidget):
         col = engine._COLS[ci]
         if col in READONLY_COLS or col in DROPDOWN_COLS:
             return
+            
+        self._manual_edits.add((r, col))
+        
         txt = item.text().replace("$", "").replace(",", "").strip()
         if col in NUMERIC_COLS:
             try:
@@ -961,16 +1293,55 @@ class DataPanel(QWidget):
                 self._df.at[r, col] = None
         else:
             self._df.at[r, col] = txt
-        self._recalc_and_refresh_row(r)
+            
+        if col == "Total con IVA":
+            tot = self._df.at[r, "Total con IVA"]
+            if pd.notna(tot):
+                tot = float(tot)
+                qty = self._df.at[r, "Cantidad"]
+                qty = float(qty) if pd.notna(qty) else 1.0
+                has_iva = str(self._df.at[r, "(+ IVA)"]).strip().lower() in ["sí", "si", "incluido"]
+                
+                if has_iva:
+                    sub = round(tot / 1.16, 2)
+                    iva = round(tot - sub, 2)
+                else:
+                    sub = tot
+                    iva = 0.0
+                    
+                pu = round(sub / qty, 2)
+                
+                self._df.at[r, "Subtotal (Sin IVA)"] = sub
+                self._df.at[r, "IVA 16%"] = iva
+                self._df.at[r, "Precio Unitario"] = pu
+            self._recalc_and_refresh_row(r, forward=False)
+            
+        elif col in ["Cantidad", "Precio Unitario"]:
+            self._recalc_and_refresh_row(r, forward=True)
+        else:
+            self._updating = True
+            row = self._df.iloc[r]
+            val = row.get(col)
+            if val is None or (isinstance(val, float) and pd.isna(val)):
+                display = ""
+            elif col in MONEY_COLS:
+                try:
+                    display = f"${float(val):,.2f}"
+                except (ValueError, TypeError):
+                    display = str(val)
+            else:
+                display = str(val)
+            item.setText(display)
+            self._updating = False
+            self._refresh_kpis()
 
-    def _recalc_and_refresh_row(self, r: int):
-        # En lugar de usar recalc_derived, hacemos cálculo ligero hacia adelante.
+    def _recalc_and_refresh_row(self, r: int, forward: bool = True):
         qty = self._df.at[r, "Cantidad"]
         qty = float(qty) if pd.notna(qty) else 1.0
         pu = self._df.at[r, "Precio Unitario"]
-        has_iva = str(self._df.at[r, "(+ IVA)"]).strip().lower() in ["sí", "si"]
+        has_iva = str(self._df.at[r, "(+ IVA)"]).strip().lower() in ["sí", "si", "incluido"]
         
-        if pd.notna(pu):
+        if forward and pd.notna(pu):
             sub = qty * float(pu)
             self._df.at[r, "Subtotal (Sin IVA)"] = sub
             if has_iva:
@@ -1139,7 +1510,24 @@ class MainWindow(QMainWindow):
         self.config_panel = ConfigPanel()
         self.config_panel.extract_requested.connect(self._start_extract)
         self.config_panel.pdf_loaded.connect(self._on_pdf_loaded)
-        h_main.addWidget(self.config_panel)
+        
+        # Área derecha (Banner + Splitter)
+        right_widget = QWidget()
+        right_layout = QVBoxLayout(right_widget)
+        right_layout.setContentsMargins(15, 15, 15, 15)
+        right_layout.setSpacing(15)
+
+        # Banner Superior
+        banner = QWidget()
+        banner.setObjectName("main_banner")
+        banner_layout = QVBoxLayout(banner)
+        lbl_title = QLabel("📝 Conciliador de Cotizaciones")
+        lbl_title.setStyleSheet("font-size: 22px; font-weight: bold; color: white;")
+        lbl_subtitle = QLabel("Extracción automática PDF · Carga múltiple · Cota de Cordura · v6.0")
+        lbl_subtitle.setStyleSheet("font-size: 13px; color: #f0f0f0;")
+        banner_layout.addWidget(lbl_title)
+        banner_layout.addWidget(lbl_subtitle)
+        right_layout.addWidget(banner)
 
         # Splitter central
         splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -1150,10 +1538,13 @@ class MainWindow(QMainWindow):
         splitter.addWidget(self.pdf_viewer)
 
         self.data_panel = DataPanel()
+        self.config_panel.section_deleted.connect(self.data_panel.remove_section_row)
         splitter.addWidget(self.data_panel)
 
         splitter.setSizes([500, 700])
-        h_main.addWidget(splitter, stretch=1)
+        right_layout.addWidget(splitter, stretch=1)
+        h_main.addWidget(self.config_panel)
+        h_main.addWidget(right_widget, stretch=1)
 
     # ── Carga de PDF ──────────────────────────────────────────
     def _on_pdf_loaded(self):
@@ -1213,9 +1604,17 @@ class MainWindow(QMainWindow):
     def _on_extract_finished(self, results: list):
         self.progress_bar.setVisible(False)
         self.config_panel.btn_extract.setEnabled(True)
-        df = pd.DataFrame(results).reindex(columns=engine._COLS)
-        df = engine.recalc_derived(df)
-        self.data_panel.load_data(df, self.config_panel.get_proyecto())
+        df_new = pd.DataFrame(results).reindex(columns=engine._COLS)
+        
+        # Merge manual edits before recalcular
+        df_old, manual_edits = self.data_panel.get_current_state()
+        if df_old is not None and not df_old.empty:
+            for r, col in manual_edits:
+                if r < len(df_new) and col in df_new.columns:
+                    df_new.at[r, col] = df_old.at[r, col]
+                    
+        df_new = engine.recalc_derived(df_new)
+        self.data_panel.load_data(df_new, self.config_panel.get_proyecto(), self.config_panel.le_token.text().strip())
         self.status.showMessage(
             f"Extracción completa · {len(results)} sección(es) procesada(s)"
         )

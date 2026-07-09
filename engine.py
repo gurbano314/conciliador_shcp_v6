@@ -33,12 +33,12 @@ _BANXICO_SERIES = {"USD": "SF43718", "EUR": "SF46410", "CAD": "SF60653"}
 _BANXICO_URL = "https://www.banxico.org.mx/SieAPIRest/service/v1"
 
 _COLS = [
-    "Tipo",
+    "Nº Sec", "Sección", "Tipo",
     "Fecha", "Rubro", "QT", "T. Cambio", "(+ IVA)", "Cantidad",
     "Precio Unitario", "Subtotal (Sin IVA)", "IVA 16%", "Total con IVA",
     "Diferencia final", "Monto en Anexo Escrito", "Observaciones",
 ]
-_WIDTHS_COL = [20, 12, 52, 5, 10, 7, 8, 16, 18, 17, 16, 18, 22, 48]
+_WIDTHS_COL = [8, 12, 20, 12, 52, 5, 10, 7, 8, 16, 18, 17, 16, 18, 22, 48]
 
 _MONEY_RE = re.compile(
     r"MX\$\s*([\d,]+(?:\.\d{1,2})?)"        # g1: MX$ prefix (con o sin espacio)
@@ -289,13 +289,13 @@ def _get_ocr():
     try:
         from rapidocr_onnxruntime import RapidOCR
         try:
-            # API 1.3.x+ (parámetros de directorio de modelos)
+            # API 1.2.x o la más nueva por defecto (sin parámetros)
+            _ocr_engine = RapidOCR()
+        except Exception:
+            # Fallback para algunas versiones intermedias (1.3.x) que exigían los argumentos
             _ocr_engine = RapidOCR(
                 det_model_dir=None, rec_model_dir=None, cls_model_dir=None
             )
-        except TypeError:
-            # API 1.2.x (sin parámetros de directorio; modelos en ruta por defecto)
-            _ocr_engine = RapidOCR()
         _ocr_available = True
         return _ocr_engine
     except Exception as exc:
@@ -316,7 +316,7 @@ def ocr_page(
     try:
         with fitz.open(stream=pdf_bytes, filetype="pdf") as doc:
             pix = doc[idx].get_pixmap(
-                matrix=fitz.Matrix(2.0, 2.0), colorspace=fitz.csRGB, alpha=False
+                matrix=fitz.Matrix(1.0, 1.0), colorspace=fitz.csRGB, alpha=False
             )
             img = np.frombuffer(pix.samples, np.uint8).reshape(
                 pix.height, pix.width, 3
@@ -500,10 +500,11 @@ def extract(
     p0: int,
     p1: int,
     det_iva: bool,
-    calc_sub: bool,
+    calc_sub: bool = True,
     tipo: str = "Cotización Proveedor",
-    moneda: str = "MXN",
+    moneda: str = "AUTO",
     bx_token: str = "",
+    sec_num: int = 1,
     on_progress: Optional[callable] = None,
     on_warning:  Optional[callable] = None,
 ) -> dict:
@@ -554,8 +555,26 @@ def extract(
     text = native_text
     tlow = text.lower()
 
+    # ── G1.5: Detectar Moneda ─────────────────────────────────
+    if moneda == "AUTO":
+        found_currency = True
+        if re.search(r"\b(usd|dl[ls]s?|dollars?|dolares|dólares)\b", tlow):
+            moneda = "USD"
+        elif re.search(r"\b(eur|euros?|€)\b", tlow):
+            moneda = "EUR"
+        elif re.search(r"\b(cad|canadian)\b", tlow):
+            moneda = "CAD"
+        elif re.search(r"\b(mxn|pesos?|m\.n\.|mn)\b", tlow):
+            moneda = "MXN"
+        else:
+            moneda = "MXN"
+            found_currency = False
+            
+        if not found_currency and on_warning:
+            on_warning(f"Sección '{label}': Moneda no explícita en texto. Se asume MXN. Por favor corrobore.")
+
     # ── G2: Detectar tipo de IVA ──────────────────────────────
-    iva_mention = re.search(r"\biva\b|i\.?\s*v\.?\s*a\.?|16\s*%|vat", tlow)
+    iva_mention = re.search(r"\biva\b|i\.?\s*v\.?\s*a\.?|16\s*%|vat|impuesto|exento|tasa\s*0", tlow)
     if not det_iva or not iva_mention:
         iva_f = "N/M"
     elif _IVA_EXEMPT_RE.search(text):
@@ -673,12 +692,13 @@ def extract(
                         str(item["qty"]), item["desc"],
                         f"${item['pu']:,.2f}", f"${item['total']:,.2f}",
                     ])
-        if ocr_used and table_rows:
+        if ocr_used:
             text  = native_text
             tlow  = text.lower()
             obs_parts.append("OCR-Selectivo (tabla imagen)")
-            _, tot, iva, sub, _sc2 = _scan_table_rows(table_rows, tot, iva, sub)
-            sub_count += _sc2
+            if table_rows:
+                _, tot, iva, sub, _sc2 = _scan_table_rows(table_rows, tot, iva, sub)
+                sub_count += _sc2
 
     # ── Estrategia 3: texto libre ─────────────────────────────
     for ln in text.splitlines():
@@ -860,8 +880,14 @@ def extract(
         elif sub and iva and not tot:
             tot = round(sub + iva, 2)
 
-    if pu is None and sub is not None and qty > 0:
-        pu = round(sub / qty, 2)
+    if pu is None and qty > 0:
+        if sub is not None:
+            pu = round(sub / qty, 2)
+        elif tot is not None:
+            if iva_f in ("Sí", "Incluido"):
+                pu = round((tot / 1.16) / qty, 2)
+            else:
+                pu = round(tot / qty, 2)
 
     # Conversión Banxico
     tc: Optional[float] = None
@@ -877,12 +903,17 @@ def extract(
             obs_parts.append(f"1 {moneda} = ${tc:.4f} MXN")
             obs_parts.append(f"Total orig.: {moneda} {tot_orig:,.2f}")
 
+    if tot is None and on_warning:
+        on_warning(f"Sección '{label}': No se detectó un Total claro. Corrobora los montos manualmente.")
+
     return {
+        "Nº Sec":                  sec_num,
+        "Sección":                 label,
         "Tipo":                    tipo,
         "Fecha":                   fecha.isoformat() if fecha else datetime.date.today().isoformat(),
         "Rubro":                   label,
         "QT":                      "Sí",
-        "T. Cambio":               f"{moneda} ({tc:.4f})" if tc else moneda,
+        "T. Cambio":               moneda,
         "(+ IVA)":                 iva_f,
         "Cantidad":                qty,
         "Precio Unitario":         pu,
