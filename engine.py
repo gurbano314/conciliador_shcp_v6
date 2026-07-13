@@ -1025,10 +1025,8 @@ def to_excel(df: pd.DataFrame, nombre: str = "", blank: bool = False) -> bytes:
         pu_val = None if blank_row else _safe_f(row_dict.get("Precio Unitario"))
         _money_cell(ws, r, 8, pu_val)
 
-        has_iva = (
-            str(row_dict.get("(+ IVA)", "N/M")).strip().lower()
-            .replace("\u00ed", "i").replace("\u00c3\u00ad", "i") == "si"
-        )
+        val_iva = str(row_dict.get("(+ IVA)", "N/M")).strip().lower().replace("\u00ed", "i").replace("\u00c3\u00ad", "i")
+        has_iva = val_iva in ["si", "incluido"]
 
         c = ws.cell(row=r, column=9,  value=f'=IF(ISNUMBER(H{r}),G{r}*H{r},"")')
         c.number_format = _FMT_MONEY; c.font = F_DATA; c.border = BD; c.alignment = AL_R
