@@ -1,5 +1,5 @@
 % ============================================================
-%  MANUAL DE USUARIO — Conciliador de Cotizaciones v6.0
+%  MANUAL DE USUARIO — Conciliador de Cotizaciones v6.1
 %  Compilar con: pdflatex -shell-escape manual.tex
 %  Requiere: texlive-full (o MiKTeX completo)
 % ============================================================
@@ -103,7 +103,7 @@
 \usepackage{fancyhdr}
 \pagestyle{fancy}
 \fancyhf{}
-\fancyhead[L]{\color{vino}\small\textbf{Conciliador de Cotizaciones v6.0}}
+\fancyhead[L]{\color{vino}\small\textbf{Conciliador de Cotizaciones v6.1}}
 \fancyhead[R]{\color{gray}\small\leftmark}
 \fancyfoot[C]{\color{gray}\small\thepage}
 \renewcommand{\headrulewidth}{0.4pt}
@@ -115,7 +115,7 @@
   linkcolor=vino,
   urlcolor=SteelBlue,
   citecolor=vino,
-  pdftitle={Manual de Usuario – Conciliador de Cotizaciones v6.0},
+  pdftitle={Manual de Usuario – Conciliador de Cotizaciones v6.1},
   pdfauthor={SHCP - UPIT},
   pdfsubject={Extracción automática de montos en cotizaciones PDF},
   pdfkeywords={cotizaciones, PDF, extracción, IVA, Banxico},
@@ -149,7 +149,7 @@
 % ── Metadata del documento ────────────────────────────────
 \title{%
   {\Huge\color{vino}\textbf{Conciliador de Cotizaciones}}\\[6pt]
-  {\Large\color{vino!70!black}Manual de Usuario — v6.0}\\[10pt]
+  {\Large\color{vino!70!black}Manual de Usuario — v6.1}\\[10pt]
   {\normalsize Motor de extracción PDF nativo con PyQt6}
 }
 \author{SHCP - UPIT}
@@ -169,7 +169,7 @@
   {\color{vino!70!black}\fontsize{18}{24}\selectfont de Cotizaciones}\\[8pt]
   {\color{vinoLite}\rule{\linewidth}{2pt}}\\[20pt]
   {\color{vino!70!black}\Large Manual de Usuario}\\[6pt]
-  {\color{vinoLite}\large Versión 6.0}\\[40pt]
+  {\color{vinoLite}\large Versión 6.1}\\[40pt]
   {\color{vino!70!black}\normalsize
     Motor de extracción PDF nativo\\
     5 estrategias de análisis · OCR · API Banxico\\[20pt]
@@ -191,7 +191,7 @@
 
 \section{¿Qué es el Conciliador?}
 
-El \textbf{Conciliador de Cotizaciones v6.0} es una aplicación de escritorio para
+El \textbf{Conciliador de Cotizaciones v6.1} es una aplicación de escritorio para
 Windows que automatiza la extracción y conciliación de montos económicos contenidos
 en archivos PDF de cotizaciones de proveedores y presupuestos de proyectos.
 
@@ -513,7 +513,7 @@ necesitas un token de la API del Banco de México para obtener el tipo de cambio
 \begin{enumerate}
   \item Ve a \href{https://www.banxico.org.mx/SieAPIRest/service/v1/token}%
         {www.banxico.org.mx → SIE API → Generar token}.
-  \item Inicia sesión con tu cuenta del Banco de México.
+  \item Resuelve el Captcha de seguridad que solicita la página.
   \item Copia el token generado.
   \item Pégalo en el campo \campo{Token} del panel lateral.
 \end{enumerate}
@@ -825,14 +825,14 @@ El motor identifica montos con los siguientes patrones:
 % ── Contraportada ─────────────────────────────────────────
 \clearpage
 \thispagestyle{empty}
-\pagecolor{darkbg}
+\pagecolor{white}
 \vspace*{\fill}
 \begin{center}
-  {\color{vinoLite}\rule{0.6\linewidth}{1pt}}\\[12pt]
-  {\color{textMuted}\large Conciliador de Cotizaciones v6.0}\\[6pt]
-  {\color{textMuted}\small Manual de Usuario}\\[6pt]
-  {\color{textMuted}\small SHCP - UPIT · \today}\\[12pt]
-  {\color{vinoLite}\rule{0.6\linewidth}{1pt}}
+  {\color{vino}\rule{0.6\linewidth}{1pt}}\\[12pt]
+  {\color{vino}\large Conciliador de Cotizaciones v6.1}\\[6pt]
+  {\color{vino}\small Manual de Usuario}\\[6pt]
+  {\color{vino}\small SHCP - UPIT · \today}\\[12pt]
+  {\color{vino}\rule{0.6\linewidth}{1pt}}
 \end{center}
 \vspace*{\fill}
 
