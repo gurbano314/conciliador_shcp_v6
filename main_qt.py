@@ -1,5 +1,5 @@
 # ============================================================
-# CONCILIADOR DE COTIZACIONES  |  main_qt.py  v6.0
+# CONCILIADOR DE COTIZACIONES  |  main_qt.py  v6.1
     # ============================================================
 from __future__ import annotations
 
@@ -1491,7 +1491,7 @@ class MainWindow(QMainWindow):
         # ── Barra de estado ───────────────────────────────────
         self.status = QStatusBar()
         self.setStatusBar(self.status)
-        self.status.showMessage("Listo · Conciliador v6.0")
+        self.status.showMessage("Listo · Conciliador v6.1")
 
         # ── Barra de progreso (oculta por defecto) ────────────
         self.progress_bar = QProgressBar()
@@ -1523,7 +1523,7 @@ class MainWindow(QMainWindow):
         banner_layout = QVBoxLayout(banner)
         lbl_title = QLabel("📝 Conciliador de Cotizaciones")
         lbl_title.setStyleSheet("font-size: 22px; font-weight: bold; color: white;")
-        lbl_subtitle = QLabel("Extracción automática PDF · Carga múltiple · Cota de Cordura · v6.0")
+        lbl_subtitle = QLabel("Extracción automática PDF · Carga múltiple · Cota de Cordura · v6.1")
         lbl_subtitle.setStyleSheet("font-size: 13px; color: #f0f0f0;")
         banner_layout.addWidget(lbl_title)
         banner_layout.addWidget(lbl_subtitle)
@@ -1624,7 +1624,7 @@ class MainWindow(QMainWindow):
         QMessageBox.about(
             self,
             "Acerca del Conciliador",
-            "<b>Conciliador de Cotizaciones v6.0</b><br>"
+            "<b>Conciliador de Cotizaciones v6.1</b><br>"
             "Motor de extracción PDF nativo con PyQt6.<br><br>"
             "5 estrategias de extracción + OCR + Banxico API.<br>"
             "Sin dependencias de servidor web."
