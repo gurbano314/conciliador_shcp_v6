@@ -1,5 +1,5 @@
 # ============================================================
-# CONCILIADOR DE COTIZACIONES  |  engine.py  v6.1
+# CONCILIADOR DE COTIZACIONES  |  engine.py  v6.4
 # Motor de extracción puro – sin dependencias de GUI.
 # Compatible con PyQt6 y cualquier otro frontend.
 # ============================================================
@@ -180,7 +180,7 @@ def _safe_f(v) -> Optional[float]:
 def _money(txt: str) -> Optional[float]:
     """Devuelve el primer monto positivo encontrado en txt."""
     for m in _MONEY_RE.finditer(str(txt)):
-        raw = m.group(1) or m.group(2) or m.group(3) or m.group(4) or m.group(5) or m.group(6)
+        raw = m.group(1) or m.group(2) or m.group(3) or m.group(4) or m.group(5)
         if raw:
             try:
                 v = float(raw.replace(",", ""))
@@ -320,18 +320,13 @@ def ocr_page(
         return ""
     try:
         with fitz.open(stream=pdf_bytes, filetype="pdf") as doc:
-            # Escala 2.5x → ~225 DPI efectivos desde un PDF estándar de 90 DPI
-            # Mejora drásticamente la legibilidad de documentos escaneados.
             pix = doc[idx].get_pixmap(
-                matrix=fitz.Matrix(2.5, 2.5), colorspace=fitz.csGRAY, alpha=False
+                matrix=fitz.Matrix(2.0, 2.0), colorspace=fitz.csRGB, alpha=False
             )
-            # Convertir a array y procesar para mejorar contraste
-            img_gray = np.frombuffer(pix.samples, np.uint8).reshape(
-                pix.height, pix.width
-            )
-            # Convertir a BGR que espera RapidOCR
-            img_bgr = np.stack([img_gray, img_gray, img_gray], axis=-1)
-            result, _ = ocr(img_bgr)
+            img = np.frombuffer(pix.samples, np.uint8).reshape(
+                pix.height, pix.width, 3
+            )[:, :, ::-1]
+            result, _ = ocr(img)
             if result:
                 return "\n".join(r[1] for r in result if r and len(r) > 1)
             return ""
