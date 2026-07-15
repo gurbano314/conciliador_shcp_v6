@@ -975,13 +975,17 @@ def to_excel(df: pd.DataFrame, nombre: str = "", blank: bool = False) -> bytes:
     AL_L = Alignment(horizontal="left",   vertical="center", wrap_text=True)
     AL_R = Alignment(horizontal="right",  vertical="center")
 
-    # Configuraciones de impresión
-    ws.page_setup.paperSize = ws.PAPERSIZE_LETTER
-    ws.page_setup.orientation = ws.ORIENTATION_PORTRAIT
-    ws.page_margins.left = 0.75
-    ws.page_margins.right = 0.75
-    ws.page_margins.top = 1.0
-    ws.page_margins.bottom = 1.0
+    # Configuraciones de impresión – Carta Horizontal
+    from openpyxl.worksheet.page import PageMargins
+    ws.page_setup.paperSize        = ws.PAPERSIZE_LETTER
+    ws.page_setup.orientation      = ws.ORIENTATION_LANDSCAPE
+    ws.page_setup.fitToPage        = True
+    ws.page_setup.fitToWidth       = 1   # encajar todas las columnas en 1 página de ancho
+    ws.page_setup.fitToHeight      = 0   # sin límite de páginas en alto
+    ws.page_margins = PageMargins(
+        left=0.5, right=0.5, top=0.75, bottom=0.75, header=0.3, footer=0.3
+    )
+    ws.print_options.horizontalCentered = True
 
     n_rows = len(df)
 
@@ -1074,6 +1078,12 @@ def to_excel(df: pd.DataFrame, nombre: str = "", blank: bool = False) -> bytes:
             c.fill = _fill("EBE2D1"); c.border = BD_MED; c.alignment = AL_R
 
     ws.freeze_panes = "A3"
+
+    # Definir área de impresión explícita
+    last_col = get_column_letter(len(_COLS))
+    last_row = DS + n_rows if n_rows > 0 else DS
+    ws.print_area = f"A1:{last_col}{last_row}"
+
     wb.save(buf)
     buf.seek(0)
     return buf.read()
