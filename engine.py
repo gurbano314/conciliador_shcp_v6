@@ -1071,7 +1071,12 @@ def to_excel(df: pd.DataFrame, nombre: str = "", blank: bool = False) -> bytes:
         ws.row_dimensions[tot_row].height = 18
         c = ws.cell(row=tot_row, column=1, value="TOTALES")
         c.font = F_TOT; c.border = BD_MED
-        for ci in (11, 12, 13):
+        # Bordes en todas las celdas del rango de totales
+        for ci in range(2, len(_COLS) + 1):
+            cx = ws.cell(row=tot_row, column=ci)
+            cx.border = BD_MED
+        # SUMAs: Subtotal (9/I), IVA 16% (10/J), Total con IVA (11/K)
+        for ci in (9, 10, 11):
             col_l = get_column_letter(ci)
             c = ws.cell(row=tot_row, column=ci, value=f"=SUM({col_l}{s_xl}:{col_l}{e_xl})")
             c.number_format = _FMT_MONEY; c.font = F_TOT
