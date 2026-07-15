@@ -41,10 +41,11 @@ _COLS = [
 _WIDTHS_COL = [8, 12, 20, 12, 52, 5, 10, 7, 8, 16, 18, 17, 16, 18, 22, 48]
 
 _MONEY_RE = re.compile(
-    r"MX\$\s*([\d,]+(?:\.\d{1,2})?)"        # g1: MX$ prefix (con o sin espacio)
-    r"|\$\s*([\d,]+(?:\.\d{1,2})?)"         # g2: $ prefix
-    r"|(?<!\d)([\d]{1,3}(?:,\d{3})+(?:\.\d{1,2})?)"  # g3: número con comas
-    r"|(?<!\d)(\d{1,9}\.\d{2})(?!\d)"       # g4: decimal suelto
+    r"MX\$\s*([\d,]+(?:\.\d{1,2})?)"              # g1: MX$ prefix
+    r"|\$\s*([\d,]+(?:\.\d{1,2})?)"               # g2: $ prefix (acepta $15,000 y $15000)
+    r"|(?<!\d)([\d]{1,3}(?:,\d{3})+(?:\.\d{1,2})?)"  # g3: número con comas (15,000)
+    r"|(?<!\d)(\d{1,9}\.\d{2})(?!\d)"             # g4: decimal suelto (15000.00)
+    r"|(?:(?:^|(?<=[:\s]))\s*([1-9]\d{3,8})(?=\s*$|\s+[^\d]))"  # g5: entero grande sin coma (15000)
 )
 _MONETARY_CTX = re.compile(
     r"total|importe|monto|precio|valor|costo|cobro|cargo|pago"
@@ -179,7 +180,7 @@ def _safe_f(v) -> Optional[float]:
 def _money(txt: str) -> Optional[float]:
     """Devuelve el primer monto positivo encontrado en txt."""
     for m in _MONEY_RE.finditer(str(txt)):
-        raw = m.group(1) or m.group(2) or m.group(3) or m.group(4)
+        raw = m.group(1) or m.group(2) or m.group(3) or m.group(4) or m.group(5) or m.group(6)
         if raw:
             try:
                 v = float(raw.replace(",", ""))
@@ -194,7 +195,7 @@ def _money_max(txt: str) -> Optional[float]:
     """Devuelve el MAYOR monto positivo encontrado en txt (útil para líneas multivalor)."""
     best: Optional[float] = None
     for m in _MONEY_RE.finditer(str(txt)):
-        raw = m.group(1) or m.group(2) or m.group(3) or m.group(4)
+        raw = m.group(1) or m.group(2) or m.group(3) or m.group(4) or m.group(5)
         if raw:
             try:
                 v = float(raw.replace(",", ""))
@@ -309,19 +310,28 @@ def ocr_page(
     idx: int,
     on_warning: Optional[callable] = None,
 ) -> str:
-    """OCR de una página. on_warning(msg) se llama ante errores no fatales."""
+    """OCR de una página. on_warning(msg) se llama ante errores no fatales.
+
+    Renderiza a 2.5x para mejorar la lectura de documentos escaneados
+    con baja resolución (ej. fotos de celular o escaneos oscuros).
+    """
     ocr = _get_ocr()
     if ocr is None:
         return ""
     try:
         with fitz.open(stream=pdf_bytes, filetype="pdf") as doc:
+            # Escala 2.5x → ~225 DPI efectivos desde un PDF estándar de 90 DPI
+            # Mejora drásticamente la legibilidad de documentos escaneados.
             pix = doc[idx].get_pixmap(
-                matrix=fitz.Matrix(1.0, 1.0), colorspace=fitz.csRGB, alpha=False
+                matrix=fitz.Matrix(2.5, 2.5), colorspace=fitz.csGRAY, alpha=False
             )
-            img = np.frombuffer(pix.samples, np.uint8).reshape(
-                pix.height, pix.width, 3
-            )[:, :, ::-1]
-            result, _ = ocr(img)
+            # Convertir a array y procesar para mejorar contraste
+            img_gray = np.frombuffer(pix.samples, np.uint8).reshape(
+                pix.height, pix.width
+            )
+            # Convertir a BGR que espera RapidOCR
+            img_bgr = np.stack([img_gray, img_gray, img_gray], axis=-1)
+            result, _ = ocr(img_bgr)
             if result:
                 return "\n".join(r[1] for r in result if r and len(r) > 1)
             return ""
