@@ -1146,7 +1146,8 @@ class DataPanel(QWidget):
 
     def get_state(self) -> dict:
         import pandas as pd
-        df_dict = self._df.to_dict(orient="records") if self._df is not None else None
+        import json
+        df_dict = json.loads(self._df.to_json(orient="records", date_format="iso")) if self._df is not None else None
         # Convert set of tuples to list of lists for JSON serialization
         manual_edits_list = [list(x) for x in self._manual_edits]
         return {
@@ -1853,16 +1854,19 @@ class MainWindow(QMainWindow):
             file_path, _ = QFileDialog.getSaveFileName(self, "Guardar Proyecto", "", "Conciliador Project (*.cshcp)")
             if not file_path:
                 return
-            self._current_project_file = file_path
             
         import json
-        state = {
-            "config": self.config_panel.get_state(),
-            "data": self.data_panel.get_state()
-        }
-        with open(file_path, "w", encoding="utf-8") as f:
-            json.dump(state, f, indent=4)
-        self.status.showMessage(f"Proyecto guardado en {file_path}", 3000)
+        try:
+            state = {
+                "config": self.config_panel.get_state(),
+                "data": self.data_panel.get_state()
+            }
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(state, f, indent=4)
+            self._current_project_file = file_path
+            self.status.showMessage(f"Proyecto guardado en {file_path}", 3000)
+        except Exception as e:
+            QMessageBox.critical(self, "Error al guardar", f"No se pudo guardar el proyecto:\n{str(e)}")
 
     def _load_project(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "Cargar Proyecto", "", "Conciliador Project (*.cshcp)")
