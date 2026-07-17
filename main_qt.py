@@ -1,5 +1,5 @@
 # ============================================================
-# CONCILIADOR DE COTIZACIONES  |  main_qt.py  v6.4
+# CONCILIADOR DE COTIZACIONES  |  main_qt.py  v6.5
     # ============================================================
 from __future__ import annotations
 
@@ -296,6 +296,15 @@ QStatusBar {{ background-color: {BG_SIDEBAR}; color: {TEXT_MUTED}; font-size: 11
 # ─────────────────────────────────────────────────────────────
 # WORKERS (hilos de fondo)
 # ─────────────────────────────────────────────────────────────
+
+class NoScrollComboBox(QComboBox):
+    def wheelEvent(self, e):
+        e.ignore()
+
+class NoScrollSpinBox(QSpinBox):
+    def wheelEvent(self, e):
+        e.ignore()
+
 class RenderWorker(QThread):
     """Renderiza una página del PDF en segundo plano."""
     finished = pyqtSignal(int, QPixmap)   # (page_idx, pixmap)
@@ -434,7 +443,7 @@ class SectionWidget(QWidget):
         # Tipo
         lbl_tipo = QLabel("Tipo")
         lbl_tipo.setStyleSheet(lbl_style)
-        self.cb_tipo = QComboBox()
+        self.cb_tipo = NoScrollComboBox()
         self.cb_tipo.addItems(["Cotización Proveedor", "Presupuesto Global"])
         clayout.addWidget(lbl_tipo)
         clayout.addWidget(self.cb_tipo)
@@ -442,7 +451,7 @@ class SectionWidget(QWidget):
         # PDF
         self.lbl_pdf = QLabel("PDF")
         self.lbl_pdf.setStyleSheet(lbl_style)
-        self.cb_pdf = QComboBox()
+        self.cb_pdf = NoScrollComboBox()
         if self._pdf_names:
             self.cb_pdf.addItems(self._pdf_names)
         else:
@@ -459,8 +468,8 @@ class SectionWidget(QWidget):
         v_p1 = QVBoxLayout(); v_p1.setContentsMargins(0,0,0,0); v_p1.setSpacing(4)
         lbl_p0 = QLabel("Pág. Inicio"); lbl_p0.setStyleSheet(lbl_style)
         lbl_p1 = QLabel("Pág. Fin");    lbl_p1.setStyleSheet(lbl_style)
-        self.sb_p0 = QSpinBox(); self.sb_p0.setMinimum(1)
-        self.sb_p1 = QSpinBox(); self.sb_p1.setMinimum(1)
+        self.sb_p0 = NoScrollSpinBox(); self.sb_p0.setMinimum(1)
+        self.sb_p1 = NoScrollSpinBox(); self.sb_p1.setMinimum(1)
         self._update_max_pages()
         v_p0.addWidget(lbl_p0); v_p0.addWidget(self.sb_p0)
         v_p1.addWidget(lbl_p1); v_p1.addWidget(self.sb_p1)
@@ -508,6 +517,18 @@ class SectionWidget(QWidget):
             "calc_sub": True,
         }
 
+    def set_config(self, cfg: dict):
+        if "label" in cfg:
+            self.le_label.setText(cfg["label"])
+        if "tipo" in cfg:
+            self.cb_tipo.setCurrentText(cfg["tipo"])
+        if "pdf_idx" in cfg and cfg["pdf_idx"] < self.cb_pdf.count():
+            self.cb_pdf.setCurrentIndex(cfg["pdf_idx"])
+        if "p0" in cfg:
+            self.sb_p0.setValue(cfg["p0"])
+        if "p1" in cfg:
+            self.sb_p1.setValue(cfg["p1"])
+
     def update_pdf_names(self, pdf_names: list[str], max_pages: list[int]):
         self._pdf_names = pdf_names
         self._max_pages = max_pages
@@ -528,6 +549,7 @@ class SectionWidget(QWidget):
 class ConfigPanel(QWidget):
     extract_requested = pyqtSignal(list, str)  # (sec_configs, bx_token)
     pdf_loaded        = pyqtSignal()
+    token_update_requested = pyqtSignal(str)
     section_deleted   = pyqtSignal(str)        # Emite el label de la sección eliminada
 
     def __init__(self, parent=None):
@@ -609,9 +631,20 @@ class ConfigPanel(QWidget):
         grp_bx = QGroupBox("Banxico – Tipo de Cambio")
         fl2 = QFormLayout(grp_bx)
         self.le_token = QLineEdit()
-        self.le_token.setPlaceholderText("Pega tu token aquí…")
+        self.le_token.setPlaceholderText("Pega tu token aquí.")
         self.le_token.setEchoMode(QLineEdit.EchoMode.Password)
-        fl2.addRow("Token:", self.le_token)
+        
+        token_layout = QHBoxLayout()
+        token_layout.addWidget(self.le_token)
+        self.btn_update_token = QPushButton("Aplicar")
+        self.btn_update_token.setToolTip("Aplicar token a la tabla de datos")
+        self.btn_update_token.setFixedHeight(24)
+        self.btn_update_token.setStyleSheet("font-size: 11px; font-weight: bold; background: transparent; border: 1px solid white; border-radius: 4px; color: white; padding: 0 6px;")
+        self.btn_update_token.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_update_token.clicked.connect(self._on_update_token)
+        token_layout.addWidget(self.btn_update_token)
+        
+        fl2.addRow("Token:", token_layout)
         self.lbl_token_status = QLabel("")
         self.lbl_token_status.setStyleSheet(f"color:{TEXT_MUTED}; font-size:11px;")
         fl2.addRow("", self.lbl_token_status)
@@ -634,7 +667,7 @@ class ConfigPanel(QWidget):
         lbl_nsec.setStyleSheet("font-size: 11px; font-weight: bold; color: #A3A8B8;")
         vl_sec.addWidget(lbl_nsec)
 
-        self.sb_nsec = QSpinBox()
+        self.sb_nsec = NoScrollSpinBox()
         self.sb_nsec.setRange(1, 50)
         self.sb_nsec.setValue(1)
         self.sb_nsec.setMinimumWidth(64)
@@ -786,6 +819,50 @@ class ConfigPanel(QWidget):
         cfgs = [sw.get_config() for sw in self._sec_widgets]
         self.extract_requested.emit(cfgs, self.le_token.text().strip())
 
+    def _on_update_token(self):
+        self.token_update_requested.emit(self.le_token.text().strip())
+
+    def get_state(self) -> dict:
+        import base64
+        pdfs = []
+        for pdf in self._pdf_files:
+            pdfs.append({
+                "name": pdf["name"],
+                "bytes": base64.b64encode(pdf["bytes"]).decode("utf-8"),
+                "pages": pdf["pages"]
+            })
+        return {
+            "proyecto": self.le_proyecto.text(),
+            "token": self.le_token.text(),
+            "pdf_files": pdfs,
+            "secciones": [sw.get_config() for sw in self._sec_widgets]
+        }
+
+    def load_state(self, state: dict):
+        import base64
+        if "proyecto" in state:
+            self.le_proyecto.setText(state["proyecto"])
+        if "token" in state:
+            self.le_token.setText(state["token"])
+        
+        # Cargar PDFs PRIMERO para que los spinboxes tengan los límites correctos
+        if "pdf_files" in state:
+            self._pdf_files = []
+            for pdf in state["pdf_files"]:
+                self._pdf_files.append({
+                    "name": pdf["name"],
+                    "bytes": base64.b64decode(pdf["bytes"]),
+                    "pages": pdf["pages"]
+                })
+            self._refresh_pdf_ui()
+            self.pdf_loaded.emit()
+
+        secciones = state.get("secciones", [])
+        self.sb_nsec.setValue(len(secciones))
+        for i, cfg in enumerate(secciones):
+            if i < len(self._sec_widgets):
+                self._sec_widgets[i].set_config(cfg)
+
     def get_pdf_files(self) -> list[dict]:
         return self._pdf_files
 
@@ -830,7 +907,7 @@ class PDFViewer(QWidget):
         self.lbl_page = QLabel("Página 0 / 0")
         self.lbl_page.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.sb_jump = QSpinBox()
+        self.sb_jump = NoScrollSpinBox()
         self.sb_jump.setMinimum(1)
         self.sb_jump.setFixedWidth(70)
         self.sb_jump.valueChanged.connect(self._on_jump)
@@ -1067,6 +1144,31 @@ class DataPanel(QWidget):
         self._manual_edits: set[tuple[int, str]] = set()
         self._build()
 
+    def get_state(self) -> dict:
+        import pandas as pd
+        df_dict = self._df.to_dict(orient="records") if self._df is not None else None
+        # Convert set of tuples to list of lists for JSON serialization
+        manual_edits_list = [list(x) for x in self._manual_edits]
+        return {
+            "df": df_dict,
+            "manual_edits": manual_edits_list
+        }
+
+    def load_state(self, state: dict):
+        import pandas as pd
+        if "df" in state and state["df"] is not None:
+            df = pd.DataFrame(state["df"]).reindex(columns=engine._COLS)
+        else:
+            df = pd.DataFrame(columns=engine._COLS)
+            
+        edits = state.get("manual_edits", [])
+        if isinstance(edits, list):
+            self._manual_edits = set(tuple(x) for x in edits)
+        else:
+            self._manual_edits = set()
+            
+        self.load_data(df)
+
     def get_current_state(self):
         return self._df, self._manual_edits
 
@@ -1075,10 +1177,18 @@ class DataPanel(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(6)
 
+        self.data_splitter = QSplitter(Qt.Orientation.Vertical)
+        self.data_splitter.setHandleWidth(4)
+
+        top_container = QWidget()
+        top_layout = QVBoxLayout(top_container)
+        top_layout.setContentsMargins(0, 0, 0, 0)
+        top_layout.setSpacing(6)
+
         # Título
         title = QLabel("✏️ Editor de Datos")
         title.setObjectName("section_title")
-        layout.addWidget(title)
+        top_layout.addWidget(title)
 
         # KPIs
         kpi_row = QHBoxLayout()
@@ -1089,17 +1199,29 @@ class DataPanel(QWidget):
         kpi_row.addWidget(self._kpi_prov[0])
         kpi_row.addWidget(self._kpi_anx[0])
         kpi_row.addWidget(self._kpi_dif[0])
-        layout.addLayout(kpi_row)
+        top_layout.addLayout(kpi_row)
 
-        # Advertencias
+        # Advertencias con Scroll
+        self.warnings_scroll = QScrollArea()
+        self.warnings_scroll.setWidgetResizable(True)
+        self.warnings_scroll.setVisible(False)
+        self.warnings_scroll.setMaximumHeight(150)
+        self.warnings_scroll.setStyleSheet(f"QScrollArea {{ border: none; background: {BG_PANEL}; }}")
+        
         self.lbl_warnings = QLabel("")
         self.lbl_warnings.setWordWrap(True)
         self.lbl_warnings.setStyleSheet(
             f"color:{ACCENT_LITE};background:{BG_PANEL};"
             f"border:1px solid {BORDER};border-radius:4px;padding:4px;"
         )
-        self.lbl_warnings.setVisible(False)
-        layout.addWidget(self.lbl_warnings)
+        self.warnings_scroll.setWidget(self.lbl_warnings)
+        top_layout.addWidget(self.warnings_scroll)
+        self.data_splitter.addWidget(top_container)
+
+        self.bot_container = QWidget()
+        self.bot_layout = QVBoxLayout(self.bot_container)
+        self.bot_layout.setContentsMargins(0, 0, 0, 0)
+        self.bot_layout.setSpacing(6)
 
         # Tabla
         self.table = QTableWidget(0, len(engine._COLS))
@@ -1121,7 +1243,7 @@ class DataPanel(QWidget):
             engine._COLS.index("Observaciones"),
             QHeaderView.ResizeMode.Stretch,
         )
-        layout.addWidget(self.table, stretch=1)
+        self.bot_layout.addWidget(self.table, stretch=1)
 
         # Botones de descarga
         btn_row = QHBoxLayout()
@@ -1136,7 +1258,11 @@ class DataPanel(QWidget):
 
         btn_row.addWidget(self.btn_export)
         btn_row.addWidget(self.btn_template)
-        layout.addLayout(btn_row)
+
+        self.bot_layout.addLayout(btn_row)
+        self.data_splitter.addWidget(self.bot_container)
+        self.data_splitter.setSizes([100, 800])
+        layout.addWidget(self.data_splitter, stretch=1)
 
         # Placeholder
         self.lbl_placeholder = QLabel(
@@ -1179,6 +1305,60 @@ class DataPanel(QWidget):
         self.table.setVisible(True)
         self._check_warnings()
 
+    def set_token(self, token: str):
+        self._token = token
+
+    def apply_token(self, new_token: str):
+        if not new_token or self._df is None or self._df.empty:
+            QMessageBox.warning(self, "Aviso", "No hay datos para aplicar o falta el token.")
+            return
+            
+        self.set_token(new_token)
+        import datetime
+        from engine import banxico_tc
+        
+        updated = False
+        self._updating = True
+        
+        for r, row in self._df.iterrows():
+            moneda = row.get("T. Cambio", "MXN")
+            if moneda != "MXN":
+                obs = str(row.get("Observaciones", ""))
+                # Si no tiene la leyenda de conversión, es porque falló previamente y sigue en moneda original
+                if f"1 {moneda} =" not in obs:
+                    fecha_str = row.get("Fecha")
+                    try:
+                        d_obj = datetime.date.fromisoformat(str(fecha_str).strip()[:10])
+                    except (ValueError, TypeError):
+                        d_obj = datetime.date.today()
+                        
+                    tc = banxico_tc(moneda, d_obj, new_token)
+                    if tc:
+                        pu = self._df.at[r, "Precio Unitario"]
+                        if pd.notna(pu):
+                            self._df.at[r, "Precio Unitario"] = round(float(pu) * tc, 2)
+                        
+                        tot_orig = self._df.at[r, "Total con IVA"]
+                        if pd.isna(tot_orig): 
+                            tot_orig = self._df.at[r, "Subtotal (Sin IVA)"]
+                            
+                        new_obs = f"1 {moneda} = ${tc:.4f} MXN | Total orig.: {moneda} {float(tot_orig if pd.notna(tot_orig) else 0):,.2f}"
+                        if obs and str(obs).strip():
+                            self._df.at[r, "Observaciones"] = str(obs) + " | " + new_obs
+                        else:
+                            self._df.at[r, "Observaciones"] = new_obs
+                            
+                        self._recalc_and_refresh_row(r)
+                        updated = True
+        
+        self._updating = False
+        if updated:
+            self._refresh_kpis()
+            self._check_warnings()
+            QMessageBox.information(self, "Token Aplicado", "Se han convertido las filas pendientes usando el nuevo token.")
+        else:
+            QMessageBox.information(self, "Token Aplicado", "El token es válido, pero no había filas pendientes por convertir.")
+
     def remove_section_row(self, label: str):
         if self._df is None or "Sección" not in self._df.columns:
             return
@@ -1197,7 +1377,7 @@ class DataPanel(QWidget):
             for ci, col in enumerate(engine._COLS):
                 val = row.get(col, "")
                 if col in DROPDOWN_COLS:
-                    cb = QComboBox()
+                    cb = NoScrollComboBox()
                     cb.addItems(DROPDOWN_COLS[col])
                     s = str(val) if val is not None and str(val) != "nan" else DROPDOWN_COLS[col][0]
                     idx_cb = cb.findText(s)
@@ -1241,6 +1421,7 @@ class DataPanel(QWidget):
         if not hasattr(self, "_token") or not self._token:
             self.lbl_warnings.setText(f"⚠️ Se detectó cambio a {new_curr} pero se requiere el Token Banxico para hacer la conversión matemática.")
             self.lbl_warnings.setVisible(True)
+            if hasattr(self, 'warnings_scroll'): self.warnings_scroll.setVisible(True)
             return
             
         import datetime
@@ -1404,6 +1585,7 @@ class DataPanel(QWidget):
     def _check_warnings(self):
         if self._df is None:
             self.lbl_warnings.setVisible(False)
+            if hasattr(self, 'warnings_scroll'): self.warnings_scroll.setVisible(False)
             return
         warn_rows = self._df[
             self._df["Observaciones"].astype(str).str.contains("⚠|OCR|inferido", na=False)
@@ -1415,13 +1597,17 @@ class DataPanel(QWidget):
             ]
             self.lbl_warnings.setText(f"⚠ {len(warn_rows)} aviso(s):\n" + "\n".join(lines))
             self.lbl_warnings.setVisible(True)
+            if hasattr(self, 'warnings_scroll'): self.warnings_scroll.setVisible(True)
         else:
             self.lbl_warnings.setVisible(False)
+            if hasattr(self, 'warnings_scroll'): self.warnings_scroll.setVisible(False)
 
     def add_warning(self, msg: str):
         cur = self.lbl_warnings.text()
         self.lbl_warnings.setText((cur + "\n" if cur else "") + f"⚠ {msg}")
         self.lbl_warnings.setVisible(True)
+        if hasattr(self, 'warnings_scroll'): self.warnings_scroll.setVisible(True)
+        if hasattr(self, 'warnings_scroll'): self.warnings_scroll.setVisible(True)
 
     def _export_excel(self):
         if self._df is None:
@@ -1472,7 +1658,7 @@ class DataPanel(QWidget):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Conciliador de Cotizaciones v6.4")
+        self.setWindowTitle("Conciliador de Cotizaciones v6.5")
         self.resize(1400, 860)
         self._extract_worker: ExtractWorker | None = None
         self._pdf_combined_bytes: bytes = b""
@@ -1484,14 +1670,17 @@ class MainWindow(QMainWindow):
         # ── Barra de menú ─────────────────────────────────────
         menu = self.menuBar()
         file_m = menu.addMenu("Archivo")
-        file_m.addAction("Acerca de…", self._show_about)
+        file_m.addAction("Cargar Proyecto...", self._load_project)
+        file_m.addAction("Guardar Proyecto...", self._save_project)
+        file_m.addSeparator()
+        file_m.addAction("Acerca de...", self._show_about)
         file_m.addSeparator()
         file_m.addAction("Salir", self.close)
 
         # ── Barra de estado ───────────────────────────────────
         self.status = QStatusBar()
         self.setStatusBar(self.status)
-        self.status.showMessage("Listo · Conciliador v6.4")
+        self.status.showMessage("Listo · Conciliador v6.5")
 
         # ── Barra de progreso (oculta por defecto) ────────────
         self.progress_bar = QProgressBar()
@@ -1505,6 +1694,9 @@ class MainWindow(QMainWindow):
         h_main = QHBoxLayout(central)
         h_main.setContentsMargins(0, 0, 0, 0)
         h_main.setSpacing(0)
+
+        self.main_splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.main_splitter.setHandleWidth(4)
 
         # Panel de config (sidebar fijo a la izquierda)
         self.config_panel = ConfigPanel()
@@ -1520,13 +1712,37 @@ class MainWindow(QMainWindow):
         # Banner Superior
         banner = QWidget()
         banner.setObjectName("main_banner")
-        banner_layout = QVBoxLayout(banner)
-        lbl_title = QLabel("📝 Conciliador de Cotizaciones")
+        banner_layout = QHBoxLayout(banner)
+        
+        # Botón Hamburguesa
+        self.btn_toggle_sidebar = QPushButton("☰")
+        self.btn_toggle_sidebar.setFixedWidth(36)
+        self.btn_toggle_sidebar.setFixedHeight(36)
+        self.btn_toggle_sidebar.setStyleSheet("font-size: 20px; font-weight: bold; background: transparent; color: white; border: none;")
+        self.btn_toggle_sidebar.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_toggle_sidebar.clicked.connect(self._toggle_sidebar)
+        banner_layout.addWidget(self.btn_toggle_sidebar)
+
+        # Botón Guardar Rápido
+        self.btn_quick_save = QPushButton(" 💾 Guardar")
+        self.btn_quick_save.setObjectName("btn_icon")
+        self.btn_quick_save.setFixedHeight(36)
+        self.btn_quick_save.setToolTip("Guardar Proyecto (Sobreescribir)")
+        self.btn_quick_save.setStyleSheet("font-size: 14px; font-weight: bold; background: rgba(255, 255, 255, 0.1); border: 1px solid white; border-radius: 4px; color: white; padding: 0 10px;")
+        self.btn_quick_save.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_quick_save.clicked.connect(self._save_project)
+        banner_layout.addWidget(self.btn_quick_save)
+        banner_layout.addSpacing(15)
+
+        text_layout = QVBoxLayout()
+        lbl_title = QLabel("📄 Conciliador de Cotizaciones")
         lbl_title.setStyleSheet("font-size: 22px; font-weight: bold; color: white;")
-        lbl_subtitle = QLabel("Extracción automática PDF · Carga múltiple · Cota de Cordura · v6.4")
+        lbl_subtitle = QLabel("Extracción automática PDF · Carga múltiple · Cota de Cordura · v6.5")
         lbl_subtitle.setStyleSheet("font-size: 13px; color: #f0f0f0;")
-        banner_layout.addWidget(lbl_title)
-        banner_layout.addWidget(lbl_subtitle)
+        text_layout.addWidget(lbl_title)
+        text_layout.addWidget(lbl_subtitle)
+        banner_layout.addLayout(text_layout)
+        banner_layout.addStretch()
         right_layout.addWidget(banner)
 
         # Splitter central
@@ -1539,10 +1755,17 @@ class MainWindow(QMainWindow):
 
         self.data_panel = DataPanel()
         self.config_panel.section_deleted.connect(self.data_panel.remove_section_row)
+        self.config_panel.le_token.textChanged.connect(self.data_panel.set_token)
+        self.config_panel.token_update_requested.connect(self.data_panel.apply_token)
         splitter.addWidget(self.data_panel)
+        splitter.setSizes([400, 600])
 
-        splitter.setSizes([500, 700])
         right_layout.addWidget(splitter, stretch=1)
+        
+        self.main_splitter.addWidget(self.config_panel)
+        self.main_splitter.addWidget(right_widget)
+        self.main_splitter.setSizes([280, 800])
+        h_main.addWidget(self.main_splitter)
         h_main.addWidget(self.config_panel)
         h_main.addWidget(right_widget, stretch=1)
 
@@ -1619,12 +1842,59 @@ class MainWindow(QMainWindow):
             f"Extracción completa · {len(results)} sección(es) procesada(s)"
         )
 
+    def _toggle_sidebar(self):
+        is_visible = self.config_panel.isVisible()
+        self.config_panel.setVisible(not is_visible)
+
+    def _save_project(self):
+        if self._current_project_file:
+            file_path = self._current_project_file
+        else:
+            file_path, _ = QFileDialog.getSaveFileName(self, "Guardar Proyecto", "", "Conciliador Project (*.cshcp)")
+            if not file_path:
+                return
+            self._current_project_file = file_path
+            
+        import json
+        state = {
+            "config": self.config_panel.get_state(),
+            "data": self.data_panel.get_state()
+        }
+        with open(file_path, "w", encoding="utf-8") as f:
+            json.dump(state, f, indent=4)
+        self.status.showMessage(f"Proyecto guardado en {file_path}", 3000)
+
+    def _load_project(self):
+        file_path, _ = QFileDialog.getOpenFileName(self, "Cargar Proyecto", "", "Conciliador Project (*.cshcp)")
+        if file_path:
+            import json
+            try:
+                try:
+                    with open(file_path, "r", encoding="utf-8") as f:
+                        state = json.load(f)
+                except UnicodeDecodeError:
+                    with open(file_path, "r", encoding="latin-1") as f:
+                        state = json.load(f)
+                
+                # Para retrocompatibilidad
+                if "config" in state:
+                    self.config_panel.load_state(state["config"])
+                    if "data" in state:
+                        self.data_panel.load_state(state["data"])
+                else:
+                    self.config_panel.load_state(state)
+                
+                self._current_project_file = file_path
+                self.status.showMessage(f"Proyecto cargado desde {file_path}", 3000)
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"No se pudo cargar el proyecto:\\n{str(e)}")
+
     # ── Acerca de ─────────────────────────────────────────────
     def _show_about(self):
         QMessageBox.about(
             self,
             "Acerca del Conciliador",
-            "<b>Conciliador de Cotizaciones v6.4</b><br>"
+            "<b>Conciliador de Cotizaciones v6.5</b><br>"
             "Motor de extracción PDF nativo con PyQt6.<br><br>"
             "5 estrategias de extracción + OCR + Banxico API.<br>"
             "Sin dependencias de servidor web."

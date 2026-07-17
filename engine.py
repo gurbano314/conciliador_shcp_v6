@@ -1,5 +1,5 @@
 # ============================================================
-# CONCILIADOR DE COTIZACIONES  |  engine.py  v6.4
+# CONCILIADOR DE COTIZACIONES  |  engine.py  v6.5
 # Motor de extracción puro – sin dependencias de GUI.
 # Compatible con PyQt6 y cualquier otro frontend.
 # ============================================================
@@ -563,11 +563,11 @@ def extract(
     # ── G1.5: Detectar Moneda ─────────────────────────────────
     if moneda == "AUTO":
         found_currency = True
-        if re.search(r"\b(usd|dl[ls]s?|dollars?|dolares|dólares)\b", tlow):
+        if re.search(r"\b(usd|dl[ls]s?|dollars?|dolares|dólares)\b|us\$", tlow):
             moneda = "USD"
-        elif re.search(r"\b(eur|euros?|€)\b", tlow):
+        elif re.search(r"\b(eur|euros?)\b|€", tlow):
             moneda = "EUR"
-        elif re.search(r"\b(cad|canadian)\b", tlow):
+        elif re.search(r"\b(cad|canadian)\b|ca\$", tlow):
             moneda = "CAD"
         elif re.search(r"\b(mxn|pesos?|m\.n\.|mn)\b", tlow):
             moneda = "MXN"
@@ -660,9 +660,9 @@ def extract(
             for i_p, p_cand in enumerate(nums):
                 if i_p == i_t or p_cand < 10.0 or found:
                     continue
-                # Evitar p == t (ej: año "2026" duplicado = 1×2026≈2026)
-                if abs(p_cand - t_cand) / max(t_cand, 1.0) < 0.001:
-                    continue
+                # Evitar p == t (ej: año "2026" duplicado) fue ELIMINADO en v6.5
+                # porque descartaba legítimamente las filas donde la cantidad es 1.
+                # Ya que se requieren 3 tokens distintos (i_q, i_p, i_t), el riesgo de falso positivo es bajo.
                 for i_q, q_cand in enumerate(nums):
                     if i_q in (i_t, i_p):
                         continue
