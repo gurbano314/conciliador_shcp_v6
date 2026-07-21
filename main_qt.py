@@ -1665,6 +1665,8 @@ class MainWindow(QMainWindow):
         self._pdf_combined_bytes: bytes = b""
         self._pdf_files: list[dict]     = []
         self._sec_cfgs:  list[dict]     = []
+        self._current_project_file: str = ""
+        self._save_worker = None  # Keep reference to prevent GC
         self._build()
 
     def _build(self):
@@ -1851,22 +1853,82 @@ class MainWindow(QMainWindow):
         if self._current_project_file:
             file_path = self._current_project_file
         else:
-            file_path, _ = QFileDialog.getSaveFileName(self, "Guardar Proyecto", "", "Conciliador Project (*.cshcp)")
+            file_path, _ = QFileDialog.getSaveFileName(
+                self, "Guardar Proyecto", "", "Conciliador Project (*.cshcp)"
+            )
             if not file_path:
                 return
-            
-        import json
+
+        # Build state in main thread (fast, just reading widgets)
         try:
             state = {
                 "config": self.config_panel.get_state(),
                 "data": self.data_panel.get_state()
             }
-            with open(file_path, "w", encoding="utf-8") as f:
-                json.dump(state, f, indent=4)
-            self._current_project_file = file_path
-            self.status.showMessage(f"Proyecto guardado en {file_path}", 3000)
         except Exception as e:
-            QMessageBox.critical(self, "Error al guardar", f"No se pudo guardar el proyecto:\n{str(e)}")
+            QMessageBox.critical(self, "Error al preparar guardado",
+                                 f"No se pudo preparar el estado:\n{str(e)}")
+            return
+
+        # Do the heavy JSON + disk write on a background thread so Qt doesn't freeze
+        self.status.showMessage("Guardando proyecto...")
+        self.btn_quick_save.setEnabled(False)
+
+        class _SaveWorker(QThread):
+            done    = pyqtSignal(str)   # success path
+            errored = pyqtSignal(str)   # error message
+
+            def __init__(self, path, data):
+                super().__init__()
+                self._path = path
+                self._data = data
+
+            def run(self):
+                import json, math
+
+                class _Enc(json.JSONEncoder):
+                    def default(self, o):
+                        # numpy int / float
+                        try:
+                            import numpy as np
+                            if isinstance(o, (np.integer,)): return int(o)
+                            if isinstance(o, (np.floating,)): return None if math.isnan(float(o)) else float(o)
+                            if isinstance(o, np.ndarray): return o.tolist()
+                        except ImportError:
+                            pass
+                        # pandas Timestamp / NaT
+                        try:
+                            import pandas as pd
+                            if isinstance(o, pd.Timestamp): return o.isoformat()
+                            if o is pd.NaT: return None
+                        except ImportError:
+                            pass
+                        return super().default(o)
+
+                try:
+                    text = json.dumps(self._data, cls=_Enc, indent=4, ensure_ascii=False)
+                    with open(self._path, "w", encoding="utf-8") as f:
+                        f.write(text)
+                    self.done.emit(self._path)
+                except Exception as exc:
+                    self.errored.emit(str(exc))
+
+        def on_done(path):
+            self._current_project_file = path
+            self.btn_quick_save.setEnabled(True)
+            self.status.showMessage(f"Guardado: {path}", 4000)
+
+        def on_error(msg):
+            self.btn_quick_save.setEnabled(True)
+            self.status.showMessage("Error al guardar.", 4000)
+            QMessageBox.critical(self, "Error al guardar",
+                                 f"No se pudo guardar el proyecto:\n{msg}")
+
+        worker = _SaveWorker(file_path, state)
+        worker.done.connect(on_done)
+        worker.errored.connect(on_error)
+        self._save_worker = worker   # prevent GC while running
+        worker.start()
 
     def _load_project(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "Cargar Proyecto", "", "Conciliador Project (*.cshcp)")
