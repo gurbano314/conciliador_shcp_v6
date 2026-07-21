@@ -1,5 +1,5 @@
 % ============================================================
-%  MANUAL DE USUARIO — Conciliador de Cotizaciones v6.1
+%  MANUAL DE USUARIO — Conciliador de Cotizaciones v6.5
 %  Compilar con: pdflatex -shell-escape manual.tex
 %  Requiere: texlive-full (o MiKTeX completo)
 % ============================================================
@@ -103,7 +103,7 @@
 \usepackage{fancyhdr}
 \pagestyle{fancy}
 \fancyhf{}
-\fancyhead[L]{\color{vino}\small\textbf{Conciliador de Cotizaciones v6.1}}
+\fancyhead[L]{\color{vino}\small\textbf{Conciliador de Cotizaciones v6.5}}
 \fancyhead[R]{\color{gray}\small\leftmark}
 \fancyfoot[C]{\color{gray}\small\thepage}
 \renewcommand{\headrulewidth}{0.4pt}
@@ -115,7 +115,7 @@
   linkcolor=vino,
   urlcolor=SteelBlue,
   citecolor=vino,
-  pdftitle={Manual de Usuario – Conciliador de Cotizaciones v6.1},
+  pdftitle={Manual de Usuario – Conciliador de Cotizaciones v6.5},
   pdfauthor={SHCP - UPIT},
   pdfsubject={Extracción automática de montos en cotizaciones PDF},
   pdfkeywords={cotizaciones, PDF, extracción, IVA, Banxico},
@@ -149,7 +149,7 @@
 % ── Metadata del documento ────────────────────────────────
 \title{%
   {\Huge\color{vino}\textbf{Conciliador de Cotizaciones}}\\[6pt]
-  {\Large\color{vino!70!black}Manual de Usuario — v6.1}\\[10pt]
+  {\Large\color{vino!70!black}Manual de Usuario — v6.5}\\[10pt]
   {\normalsize Motor de extracción PDF nativo con PyQt6}
 }
 \author{SHCP - UPIT}
@@ -169,11 +169,11 @@
   {\color{vino!70!black}\fontsize{18}{24}\selectfont de Cotizaciones}\\[8pt]
   {\color{vinoLite}\rule{\linewidth}{2pt}}\\[20pt]
   {\color{vino!70!black}\Large Manual de Usuario}\\[6pt]
-  {\color{vinoLite}\large Versión 6.1}\\[40pt]
+  {\color{vinoLite}\large Versión 6.5}\\[40pt]
   {\color{vino!70!black}\normalsize
     Motor de extracción PDF nativo\\
     5 estrategias de análisis · OCR · API Banxico\\[20pt]
-    Interfaz nativa Windows (PyQt6)
+    Guardado de proyectos · Interfaz nativa Windows (PyQt6)
   }\\[50pt]
   {\color{borderCol}\small SHCP - UPIT · \today}
 \end{titlepage}
@@ -191,7 +191,7 @@
 
 \section{¿Qué es el Conciliador?}
 
-El \textbf{Conciliador de Cotizaciones v6.1} es una aplicación de escritorio para
+El \textbf{Conciliador de Cotizaciones v6.5} es una aplicación de escritorio para
 Windows que automatiza la extracción y conciliación de montos económicos contenidos
 en archivos PDF de cotizaciones de proveedores y presupuestos de proyectos.
 
@@ -218,6 +218,13 @@ documentos PDF con los montos registrados en el Anexo Escrito del proyecto.
         sección a un archivo y rango de páginas diferente.
   \item \textbf{Exportación a Excel:} Genera un reporte \texttt{.xlsx} con formato
         profesional, fórmulas de validación y estilo corporativo.
+  \item \textbf{Guardado y carga de proyectos:} Guarda el estado completo del
+        proyecto (PDFs, secciones, tabla y token) en un archivo \texttt{.cshcp}
+        portable entre equipos.
+  \item \textbf{Botón de guardado rápido:} Acceso directo en la barra superior
+        para guardar sin navegar menús.
+  \item \textbf{Actualización de token en caliente:} Cambia el token de Banxico
+        sin perder las ediciones manuales ya realizadas en la tabla.
   \item \textbf{Interfaz nativa:} Aplicación \texttt{.exe} autónoma para Windows.
 \end{itemize}
 
@@ -295,6 +302,27 @@ La ventana principal está dividida en tres zonas:
   \item \textbf{Editor de datos} (derecha): tabla de resultados y KPIs.
 \end{enumerate}
 
+\subsection{Barra superior (Banner)}
+
+La barra superior contiene dos botones de acceso rápido siempre visibles:
+
+\begin{table}[H]
+  \centering
+  \begin{tabularx}{\linewidth}{lX}
+    \toprule
+    \textbf{Botón} & \textbf{Función} \\
+    \midrule
+    \btn{☰} (Hamburguesa) & Muestra u oculta el panel lateral de configuración.
+                             Útil para ganar espacio en pantallas pequeñas. \\
+    \btn{💾 Guardar}      & Guarda el proyecto actual en el archivo \texttt{.cshcp}
+                             asociado. Si es la primera vez, abre el diálogo de
+                             guardado. Las guardadas posteriores son silenciosas
+                             (sin diálogo) y se confirman en la barra de estado. \\
+    \bottomrule
+  \end{tabularx}
+  \caption{Botones de la barra superior.}
+\end{table}
+
 \section{Panel lateral — Configuración}
 
 \begin{figure}[H]
@@ -326,6 +354,17 @@ en los encabezados del reporte Excel exportado.
 Introduce el token de la API del Banco de México para habilitar la conversión
 automática de divisas. El token se muestra enmascarado por seguridad.
 Ver \hyperref[sec:banxico]{Sección~\ref{sec:banxico}} para obtener el token.
+
+Junto al campo de token se encuentra el botón \btn{Aplicar}. Úsalo cuando
+haya cambiado el token después de una extracción: aplica el nuevo tipo de
+cambio a las filas que aún están en divisa extranjera \textbf{sin borrar las
+ediciones manuales} que hayas realizado en la tabla.
+
+\begin{consejobox}
+Si ya extrajiste datos, corregiste algunas celdas manualmente y luego
+necesitas actualizar el token, usa el botón \btn{Aplicar} en lugar de
+volver a presionar \btn{Extraer Montos}. Así conservas tus correcciones.
+\end{consejobox}
 
 \subsection{Secciones (Cotizaciones)}
 
@@ -643,9 +682,11 @@ Cuando la moneda seleccionada es USD, EUR o CAD:
 \end{enumerate}
 
 \begin{consejobox}
-Los tipos de cambio se almacenan en caché durante la sesión. Si cambias el
-token a mitad de sesión, los tipos de cambio ya consultados no se vuelven a
-descargar. Reinicia la app para forzar una nueva consulta.
+Los tipos de cambio se almacenan en caché durante la sesión. Si necesitas
+actualizar el tipo de cambio con un token nuevo sin perder tus ediciones,
+usa el botón \btn{Aplicar} ubicado junto al campo de token en el panel
+lateral. Este botón solo recalcula las celdas en divisa extranjera que
+aún no han sido confirmadas manualmente.
 \end{consejobox}
 
 \section{La columna Observaciones}
@@ -669,6 +710,63 @@ extracción. Algunos mensajes comunes:
   \end{tabularx}
   \caption{Mensajes comunes en la columna Observaciones.}
 \end{table}
+
+% =============================================================
+\chapter{Gestión de Proyectos (\texttt{.cshcp})}
+% =============================================================
+\label{ch:proyectos}
+
+Desde la versión 6.5, el Conciliador permite guardar y cargar el estado
+completo de una sesión de trabajo en un archivo con extensión \texttt{.cshcp}
+(Conciliador SHCP).
+
+\section{¿Qué contiene un archivo .cshcp?}
+
+El archivo guarda en un único documento portable:
+
+\begin{itemize}
+  \item Los PDFs cargados (incrustados en base64).
+  \item El nombre del proyecto y el token de Banxico.
+  \item La configuración de todas las secciones (rangos, tipos, rutas).
+  \item La tabla completa de resultados con todas las ediciones manuales.
+\end{itemize}
+
+\begin{notabox}
+El archivo \texttt{.cshcp} es completamente autónomo. Puedes enviarlo por
+correo o copiarlo a una USB — quien lo reciba solo necesita el Conciliador
+v6.5 para abrirlo y continuar exactamente donde lo dejaste.
+\end{notabox}
+
+\section{Guardar un proyecto}
+
+\begin{enumerate}
+  \item \textbf{Primera vez:} Usa \textit{Archivo → Guardar Proyecto...} o el
+        botón \btn{💾 Guardar} en la barra superior. Se abrirá un diálogo de
+        guardado para elegir nombre y ubicación.
+  \item \textbf{Guardado rápido:} Una vez que el proyecto tiene un archivo
+        asociado, presiona \btn{💾 Guardar} en cualquier momento. El archivo
+        se sobreescribe en segundo plano; la barra de estado confirma
+        \textit{«Guardado: …»} al terminar sin interrumpir tu trabajo.
+\end{enumerate}
+
+\begin{warningbox}
+Durante el guardado el botón \btn{💾 Guardar} se deshabilita brevemente para
+evitar guardados duplicados. Si no ves la confirmación en la barra de estado
+espera un segundo; los proyectos con PDFs grandes pueden tardar más.
+\end{warningbox}
+
+\section{Cargar un proyecto}
+
+\begin{enumerate}
+  \item Ve a \textit{Archivo → Cargar Proyecto...}.
+  \item Selecciona el archivo \texttt{.cshcp} deseado.
+  \item La aplicación restaura los PDFs, secciones y tabla automáticamente.
+\end{enumerate}
+
+\begin{notabox}
+No es necesario cargar los PDFs por separado; están incluidos dentro del
+propio archivo \texttt{.cshcp}.
+\end{notabox}
 
 % =============================================================
 \chapter{Solución de Problemas}
@@ -710,6 +808,19 @@ cuando el contenido es mayor que la ventana. Si no aparece:
 \begin{itemize}
   \item Asegúrate de que la ventana principal tenga al menos 700 px de alto.
   \item Arrastra el borde inferior de la ventana para agrandarla.
+\end{itemize}
+
+\section{El scroll cambia valores de la tabla por error}
+
+Si al deslizar los dedos en el touchpad (o la rueda del ratón) sobre el
+panel lateral o la tabla de resultados se modifican inadvertidamente los
+menús desplegables (Tipo, Moneda) o el contador de secciones:
+
+\begin{itemize}
+  \item Este comportamiento está \textbf{corregido en v6.5}. Todos los
+        controles desplegables y numéricos ignoran el scroll del dispositivo
+        apuntador; solo cambian cuando se hace clic explícito sobre ellos.
+  \item Si usas una versión anterior, actualiza a v6.5.
 \end{itemize}
 
 \section{Error de Token Banxico}
@@ -757,8 +868,11 @@ Sí. Todas las celdas (excepto \campo{Diferencia final}) son editables con
 doble clic. Los KPIs y la diferencia se recalculan automáticamente.
 
 \item[¿El programa guarda mis configuraciones?]
-La versión actual no guarda la configuración entre sesiones. Debes
-reconfigurar las secciones cada vez que abres la aplicación.
+Sí. Desde la versión 6.5 puedes guardar el estado completo (PDFs, secciones,
+tabla y token) en un archivo \texttt{.cshcp} con el botón \btn{💾 Guardar}
+de la barra superior o desde \textit{Archivo → Guardar Proyecto...}.
+Al reabrir el archivo todo queda exactamente como lo dejaste.
+Ver \hyperref[ch:proyectos]{Capítulo~\ref{ch:proyectos}} para más detalles.
 
 \item[¿Funciona sin internet?]
 Sí, con la excepción de la consulta del tipo de cambio a Banxico.
@@ -832,7 +946,7 @@ El motor identifica montos con los siguientes patrones:
 \vspace*{\fill}
 \begin{center}
   {\color{vino}\rule{0.6\linewidth}{1pt}}\\[12pt]
-  {\color{vino}\large Conciliador de Cotizaciones v6.1}\\[6pt]
+  {\color{vino}\large Conciliador de Cotizaciones v6.5}\\[6pt]
   {\color{vino}\small Manual de Usuario}\\[6pt]
   {\color{vino}\small SHCP - UPIT · \today}\\[12pt]
   {\color{vino}\rule{0.6\linewidth}{1pt}}
